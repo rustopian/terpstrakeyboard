@@ -162,19 +162,26 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
     //convert the hex to rgb
     returnColor = hex2rgb(returnColor);
 
-    // If invert_updown is true, darken all colors by default
+    // First apply inversion if needed
     if (settings.invert_updown) {
       returnColor[0] = Math.max(0, returnColor[0] - 90);
       returnColor[1] = Math.max(0, returnColor[1] - 90);
       returnColor[2] = Math.max(0, returnColor[2] - 90);
     }
 
-    // Then handle pressed state, but maintain darkness if inverted
+    // Handle pressed state
     if (pressed) {
-      const darkenAmount = settings.invert_updown ? 45 : 90; // Less darkening if already dark
-      returnColor[0] = Math.max(0, returnColor[0] - darkenAmount);
-      returnColor[1] = Math.max(0, returnColor[1] - darkenAmount);
-      returnColor[2] = Math.max(0, returnColor[2] - darkenAmount);
+      if (settings.invert_updown) {
+        // In inverted mode, lighten when pressed
+        returnColor[0] = Math.min(255, returnColor[0] + 90);
+        returnColor[1] = Math.min(255, returnColor[1] + 90);
+        returnColor[2] = Math.min(255, returnColor[2] + 90);
+      } else {
+        // In normal mode, darken when pressed (original behavior)
+        returnColor[0] = Math.max(0, returnColor[0] - 90);
+        returnColor[1] = Math.max(0, returnColor[1] - 90);
+        returnColor[2] = Math.max(0, returnColor[2] - 90);
+      }
     }
 
     return rgb(returnColor[0], returnColor[1], returnColor[2]);
@@ -192,13 +199,19 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
   if (reduced < 0) reduced += 1;
   h = (reduced + h) % 1;
 
-  // If invert_updown is true, use a darker base value
+  // Start with base value and apply inversion first
   let baseV = settings.invert_updown ? v * 0.5 : v;
 
-  // Then handle pressed state with less darkening if already inverted
-  const pressedV = settings.invert_updown ? baseV * 0.75 : baseV * 0.5;
-  const finalV = pressed ? pressedV : baseV;
+  // Handle pressed state
+  if (pressed) {
+    if (settings.invert_updown) {
+      // In inverted mode, increase value when pressed
+      baseV = baseV * 2;
+    } else {
+      // In normal mode, decrease value when pressed (original behavior)
+      baseV = baseV * 0.5;
+    }
+  }
 
-  returnColor = HSVtoRGB(h, s, finalV);
-  return returnColor;
+  return HSVtoRGB(h, s, baseV);
 } 

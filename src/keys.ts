@@ -676,6 +676,14 @@ function goKeyboard(): boolean {
   const keyboard = document.getElementById("keyboard");
   if (keyboard) keyboard.style.display = "block";
 
+  // Reset all pressed states
+  settings.pressedKeys = [];
+  settings.isMouseDown = false;
+  settings.isTouchDown = false;
+  settings.activeHexObjects = [];
+  settings.sustainedNotes = [];
+  settings.sustain = false;
+
   // Initialize audio context if not already initialized
   if (!settings.audioContext) {
     const ctx = initAudio();
@@ -742,9 +750,6 @@ function goKeyboard(): boolean {
   resizeHandler();
 
   // Initialize event handlers
-  settings.sustain = false;
-  settings.sustainedNotes = [];
-  settings.activeHexObjects = [];
   console.log("Initializing event handlers with settings:", settings);
   initEventHandlers(settings);
 
@@ -1021,7 +1026,7 @@ export function drawGrid(): void {
     for (let ur = -Math.floor(max); ur < max; ur++) {
       const coords = new Point(r, ur);
       const centsObj = hexCoordsToCents(coords);
-      drawHex(coords, centsToColor(centsObj, settings.invert_updown));
+      drawHex(coords, centsToColor(centsObj, false));
     }
   }
 }
