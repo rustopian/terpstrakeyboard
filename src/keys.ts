@@ -119,6 +119,7 @@ declare global {
     };
     updateColorVisionMode: () => void;
     updateColorSaturation: () => void;
+    updateKeyboardDisplay: () => void;
   }
 
   interface WebMidiOutput {
@@ -135,6 +136,7 @@ declare global {
 
 // Global variables
 let myOutput: any = null;
+let current_text_color = "#000000";
 const instruments: Instrument[] = [
   { fileName: "piano", fade: 0.1 },
   { fileName: "harpsichord", fade: 0.2 },
@@ -237,6 +239,7 @@ window.hideRevealNames = hideRevealNames;
 window.hideRevealEnum = hideRevealEnum;
 window.updateColorVisionMode = updateColorVisionMode;
 window.updateColorSaturation = updateColorSaturation;
+window.updateKeyboardDisplay = updateKeyboardDisplay;
 
 if (window.WebMidi) {
   // Only enable WebMidi if the checkbox is checked
@@ -380,43 +383,27 @@ function applyColorTransformations(colors: string[]): string[] {
   return transformColorsForCVD(saturatedColors, settings.colorVisionMode);
 }
 
-// Update keyboard display function
-function updateKeyboardDisplay(): void {
+// Add keyboard display update function
+export function updateKeyboardDisplay(): void {
   // Update all the settings
   settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
   settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement).checked;
   settings.enum = (document.getElementById('enum') as HTMLInputElement).checked;
   settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
-  settings.names = (document.getElementById('names') as HTMLInputElement).value.split('\n');
+  settings.names = (document.getElementById('names') as HTMLTextAreaElement).value.split('\n');
   settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
-  parseScaleColors();
-
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  if (!noteColorsElement) return;
-
-  const colors = noteColorsElement.value.split('\n');
-  const transformedColors = applyColorTransformations(colors);
   
-  // Update keyboard colors
-  const keys = document.getElementsByClassName('piano-key');
-  Array.from(keys).forEach((key, index) => {
-    const keyElement = key as HTMLElement;
-    const baseColor = transformedColors[index] || '#ffffff';
-    
-    if (settings.invert_updown) {
-      // Convert to RGB to darken
-      const rgb = hex2rgb(baseColor);
-      rgb[0] = Math.max(0, rgb[0] - 90);
-      rgb[1] = Math.max(0, rgb[1] - 90);
-      rgb[2] = Math.max(0, rgb[2] - 90);
-      keyElement.style.backgroundColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-    } else {
-      keyElement.style.backgroundColor = baseColor;
-    }
-  });
-
-  // Redraw the grid
-  drawGrid();
+  // Update text color based on invert setting
+  current_text_color = settings.invert_updown ? "#ffffff" : "#000000";
+  
+  // Parse scale and colors
+  parseScaleColors();
+  
+  // Clear and redraw the entire grid
+  if (settings.canvas && settings.context) {
+    settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
+    drawGrid();
+  }
 }
 
 // Update preview buttons function

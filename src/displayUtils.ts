@@ -93,7 +93,8 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
   settings.context.translate(hexCenter.x, hexCenter.y);
   settings.context.rotate(-settings.rotation);
 
-  settings.context.fillStyle = getContrastYIQ(current_text_color);
+  // Use current_text_color directly instead of getting contrast
+  settings.context.fillStyle = current_text_color;
   settings.context.font = "22pt Arial";
   settings.context.textAlign = "center";
   settings.context.textBaseline = "middle";
@@ -120,7 +121,7 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
     const scaleFactor = settings.hexSize / 50;
     settings.context.scale(scaleFactor, scaleFactor);
     settings.context.translate(10, -25);
-    settings.context.fillStyle = "white";
+    settings.context.fillStyle = current_text_color; // Use current_text_color here too
     settings.context.font = "12pt Arial";
     settings.context.textAlign = "center";
     settings.context.textBaseline = "middle";
@@ -140,6 +141,9 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
   const centsValue = typeof centsObj === 'object' ? centsObj.cents : centsObj;
   const reducedSteps = typeof centsObj === 'object' ? centsObj.reducedSteps : undefined;
 
+  // Set text color based on invert setting, regardless of other conditions
+  current_text_color = settings?.invert_updown ? "#ffffff" : "#000000";
+
   // Default color if settings is not initialized
   if (!settings || typeof settings.spectrum_colors === 'undefined') {
     return "#EDEDE4";
@@ -154,22 +158,29 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
 
     //convert color name to hex
     returnColor = nameToHex(returnColor);
-    current_text_color = returnColor;
-
+    
     //convert the hex to rgb
     returnColor = hex2rgb(returnColor);
 
-    //darken for pressed key (or unpressed if inverted)
-    const shouldDarken = settings.invert_updown ? !pressed : pressed;
-    if (shouldDarken) {
+    // If invert_updown is true, darken all colors by default
+    if (settings.invert_updown) {
       returnColor[0] = Math.max(0, returnColor[0] - 90);
       returnColor[1] = Math.max(0, returnColor[1] - 90);
       returnColor[2] = Math.max(0, returnColor[2] - 90);
     }
 
+    // Then handle pressed state, but maintain darkness if inverted
+    if (pressed) {
+      const darkenAmount = settings.invert_updown ? 45 : 90; // Less darkening if already dark
+      returnColor[0] = Math.max(0, returnColor[0] - darkenAmount);
+      returnColor[1] = Math.max(0, returnColor[1] - darkenAmount);
+      returnColor[2] = Math.max(0, returnColor[2] - darkenAmount);
+    }
+
     return rgb(returnColor[0], returnColor[1], returnColor[2]);
   }
 
+  // Handle spectrum colors
   const fcolor = hex2rgb("#" + settings.fundamental_color);
   const hsv = rgb2hsv(fcolor[0], fcolor[1], fcolor[2]);
 
@@ -181,15 +192,13 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
   if (reduced < 0) reduced += 1;
   h = (reduced + h) % 1;
 
-  // Invert the pressed state if invert_updown is true
-  const shouldDarken = settings.invert_updown ? !pressed : pressed;
-  const finalV = shouldDarken ? v - (v / 2) : v;
+  // If invert_updown is true, use a darker base value
+  let baseV = settings.invert_updown ? v * 0.5 : v;
+
+  // Then handle pressed state with less darkening if already inverted
+  const pressedV = settings.invert_updown ? baseV * 0.75 : baseV * 0.5;
+  const finalV = pressed ? pressedV : baseV;
 
   returnColor = HSVtoRGB(h, s, finalV);
-
-  //setup text color
-  const tcolor = HSVtoRGB2(h, s, finalV);
-  current_text_color = rgbToHex(tcolor.red, tcolor.green, tcolor.blue);
-  
   return returnColor;
 } 
