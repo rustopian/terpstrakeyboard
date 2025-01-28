@@ -27,6 +27,7 @@ interface AudioResult {
 
 let settings: Settings | undefined;
 let myOutput: WebMidiOutput | null = null;
+let activeNotes: ActiveHex[] = [];
 
 export function initActiveHex(appSettings: Settings, output: WebMidiOutput | null): void {
   settings = appSettings;
@@ -99,4 +100,52 @@ export class ActiveHex {
       stopNote(this.gainNode, this.source);
     }
   }
+}
+
+export function addActiveNote(hex: ActiveHex): void {
+  activeNotes.push(hex);
+  console.log('Note added, current active notes:', activeNotes.length, 
+    'MIDI values:', activeNotes.map(hex => 
+      settings ? getMidiFromCoords(hex.coords, settings.rSteps, settings.urSteps) : null
+    )
+  );
+}
+
+export function removeActiveNote(hex: ActiveHex): void {
+  activeNotes = activeNotes.filter(note => 
+    note.coords.x !== hex.coords.x || note.coords.y !== hex.coords.y
+  );
+  console.log('Note removed, current active notes:', activeNotes.length,
+    'MIDI values:', activeNotes.map(hex => 
+      settings ? getMidiFromCoords(hex.coords, settings.rSteps, settings.urSteps) : null
+    )
+  );
+}
+
+export function clearAllNotes(): void {
+  activeNotes = [];
+  if (settings?.sustainedNotes) {
+    settings.sustainedNotes = [];
+  }
+}
+
+export function getActiveNotes(): number[] {
+  if (!settings) return [];
+  
+  // First clean up any stuck notes
+  const pressedKeys = window.settings.pressedKeys || [];
+  const mouseDown = window.settings.isMouseDown || false;
+  const touchDown = window.settings.isTouchDown || false;
+  
+  if (pressedKeys.length === 0 && !mouseDown && !touchDown) {
+    clearAllNotes();
+  }
+  
+  const notes = activeNotes.map(hex => 
+    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps)
+  );
+  if (notes.length >= 2) {
+    console.log('getActiveNotes returning multiple notes:', notes);
+  }
+  return notes;
 } 

@@ -2,7 +2,7 @@
 import { hexCoordsToCents, getHexCoordsAt } from './hexUtils';
 import { Point } from './geometry';
 import { centsToColor, drawHex } from './displayUtils';
-import { ActiveHex, initActiveHex } from './activeHex';
+import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote } from './activeHex';
 
 interface Settings {
   canvas: HTMLCanvasElement;
@@ -131,6 +131,7 @@ function onKeyDown(e: KeyboardEvent): void {
       settings.activeHexObjects = [];
     }
     settings.activeHexObjects.push(hex);
+    addActiveNote(hex);
     const centsObj = hexCoordsToCents(coords);
     drawHex(coords, centsToColor(centsObj, true));
     hex.noteOn(centsObj);
@@ -145,6 +146,7 @@ function onKeyUp(e: KeyboardEvent): void {
     if (settings.sustainedNotes) {
       for (const note of settings.sustainedNotes) {
         note.noteOff();
+        removeActiveNote(note);
       }
       settings.sustainedNotes = [];
     }
@@ -161,7 +163,9 @@ function onKeyUp(e: KeyboardEvent): void {
           coords.equals(hex.coords)
         );
         if (hexIndex !== -1) {
-          settings.activeHexObjects[hexIndex].noteOff();
+          const hex = settings.activeHexObjects[hexIndex];
+          hex.noteOff();
+          removeActiveNote(hex);
           settings.activeHexObjects.splice(hexIndex, 1);
         }
       }
@@ -188,10 +192,13 @@ const mouseUp = (_e: MouseEvent) => {
   }
   settings.canvas.removeEventListener("mousemove", mouseActive);
   if (settings.activeHexObjects && settings.activeHexObjects.length > 0) {
-    const coords = settings.activeHexObjects[0].coords;
-    settings.activeHexObjects[0].noteOff();
-    drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
-    settings.activeHexObjects.pop();
+    for (const hex of settings.activeHexObjects) {
+      hex.noteOff();
+      removeActiveNote(hex);
+      const coords = hex.coords;
+      drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+    }
+    settings.activeHexObjects = [];
   }
 };
 
@@ -219,19 +226,25 @@ function mouseActive(e: MouseEvent): void {
   }
 
   if (settings.activeHexObjects.length === 0) {
-    settings.activeHexObjects[0] = new ActiveHex(coords);
+    const hex = new ActiveHex(coords);
+    settings.activeHexObjects[0] = hex;
+    addActiveNote(hex);
     const centsObj = hexCoordsToCents(coords);
-    settings.activeHexObjects[0].noteOn(centsObj);
+    hex.noteOn(centsObj);
     drawHex(coords, centsToColor(centsObj, true));
   } else {
     if (!(coords.equals(settings.activeHexObjects[0].coords))) {
-      settings.activeHexObjects[0].noteOff();
-      const oldCentsObj = hexCoordsToCents(settings.activeHexObjects[0].coords);
-      drawHex(settings.activeHexObjects[0].coords, centsToColor(oldCentsObj, false));
+      const oldHex = settings.activeHexObjects[0];
+      oldHex.noteOff();
+      removeActiveNote(oldHex);
+      const oldCentsObj = hexCoordsToCents(oldHex.coords);
+      drawHex(oldHex.coords, centsToColor(oldCentsObj, false));
 
-      settings.activeHexObjects[0] = new ActiveHex(coords);
+      const newHex = new ActiveHex(coords);
+      settings.activeHexObjects[0] = newHex;
+      addActiveNote(newHex);
       const centsObj = hexCoordsToCents(coords);
-      settings.activeHexObjects[0].noteOn(centsObj);
+      newHex.noteOn(centsObj);
       drawHex(coords, centsToColor(centsObj, true));
     }
   }
@@ -312,8 +325,10 @@ function handleTouch(e: TouchEvent): void {
 
   for (let i = settings.activeHexObjects.length - 1; i >= 0; i--) {
     if (settings.activeHexObjects[i].release) {
-      const coords = settings.activeHexObjects[i].coords;
-      settings.activeHexObjects[i].noteOff();
+      const hex = settings.activeHexObjects[i];
+      const coords = hex.coords;
+      hex.noteOff();
+      removeActiveNote(hex);
       drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
       settings.activeHexObjects.splice(i, 1);
     }

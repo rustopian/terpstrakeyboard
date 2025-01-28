@@ -14,7 +14,6 @@ import {
 // Import event handling functions
 import {
   initEventHandlers,
-  removeEventHandlers
 } from './eventHandler';
 
 // Import hex utility functions
@@ -435,7 +434,7 @@ function updatePreviewButtons(): void {
   noteButtons.innerHTML = '';
   
   // Apply all color transformations
-  const transformedColors = applyColorTransformations(colors);
+  const transformedColors = applyColorTransformations(colors.map(c => `#${c}`));
   
   // Create new preview buttons
   names.forEach((name, index) => {
@@ -851,10 +850,6 @@ window.addEventListener('load', () => {
   }
 }, false);
 
-function init(): void {
-  // Audio context will be initialized in goKeyboard after user interaction
-}
-
 // Add interface for preset structure
 interface Preset {
   label: string;
@@ -963,6 +958,8 @@ function populatePresetDropdown(): void {
 function updateNoteConfigFromPreset(parameters: QueryDataInterface): void {
   const namesElement = document.getElementById('names') as HTMLTextAreaElement;
   const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+  const rStepsElement = document.getElementById('rSteps') as HTMLInputElement;
+  const urStepsElement = document.getElementById('urSteps') as HTMLInputElement;
 
   // Update note names if provided
   if (parameters.names && Array.isArray(parameters.names)) {
@@ -974,78 +971,52 @@ function updateNoteConfigFromPreset(parameters: QueryDataInterface): void {
     noteColorsElement.value = parameters.note_colors.join('\n');
   }
 
+  // Update rSteps and urSteps if provided
+  if (parameters.right) {
+    rStepsElement.value = String(parameters.right);
+    settings.rSteps = parseInt(String(parameters.right));
+  }
+  if (parameters.upright) {
+    urStepsElement.value = String(parameters.upright);
+    settings.urSteps = parseInt(String(parameters.upright));
+  }
+
+  // Trigger URL update and redraw if steps were changed
+  if (parameters.right || parameters.upright) {
+    changeURL();
+    resizeHandler(); // This will trigger a redraw with new steps
+  }
+
   // Reinitialize note configuration UI
   initNoteConfig();
 }
 
-// Update checkPreset to also update note configuration
-function checkPreset(init: number): void {
+// Modify the checkPreset function to trigger the Lumatone preset selection
+function checkPreset(_init: number): void {
   const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
   if (!mselect) return;
 
-  const url_str = window.location.href;
-  let presetFound = false;
-
-  // First check for .htm as end of url and set the default preset
-  if (url_str.substr(url_str.length - 4) === '.htm') {
-    // Find the 31-ed2 preset option
-    for (let i = 0; i < mselect.options.length; i++) {
-      if (mselect.options[i].text === "31-ed2 Bosanquet / Wilson / Terpstra") {
-        mselect.value = mselect.options[i].value;
-        presetFound = true;
-        // Trigger the onchange event to load the preset
-        const event = new Event('change');
-        mselect.dispatchEvent(event);
-        break;
+  // Find and select the Lumatone preset
+  for (let i = 0; i < mselect.options.length; i++) {
+    if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
+      mselect.selectedIndex = i;
+      // Trigger the change event to apply the preset
+      mselect.dispatchEvent(new Event('change'));
+      
+      // Initialize audio context and load samples
+      const ctx = initAudio();
+      if (ctx) {
+        settings.audioContext = ctx;
+        console.log("[DEBUG] Audio context initialized after preset:", ctx.state);
+        
+        // Load the instrument samples
+        loadInstrumentSamples();
       }
+      return;
     }
   }
 
-  // Find matching preset from URL parameters
-  if (!presetFound && window.location.search) {
-    const currentParams = new URLSearchParams(window.location.search);
-    
-    // Try to find a matching preset
-    for (let i = 0; i < mselect.options.length; i++) {
-      if (mselect.options[i].value) {
-        const presetParams = new URLSearchParams(mselect.options[i].value.substring(1)); // Remove leading '?'
-        let matches = true;
-        
-        // Compare relevant parameters
-        const paramsToCheck = ['fundamental', 'right', 'upright', 'size', 'rotation', 'instrument', 
-                             'enum', 'equivSteps', 'spectrum_colors', 'no_labels'];
-        
-        for (const param of paramsToCheck) {
-          if (currentParams.get(param) !== presetParams.get(param)) {
-            matches = false;
-            break;
-          }
-        }
-        
-        // Check array parameters separately (they might be encoded differently)
-        ['scale', 'names', 'note_colors'].forEach(param => {
-          const currentValue = currentParams.get(param);
-          const presetValue = presetParams.get(param);
-          if (currentValue !== presetValue) {
-            matches = false;
-          }
-        });
-        
-        if (matches) {
-          mselect.value = mselect.options[i].value;
-          presetFound = true;
-          break;
-        }
-      }
-    }
-  }
-
-  // If no matching preset was found, select the "Choose Preset" option
-  if (!presetFound) {
-    mselect.selectedIndex = 0;
-  }
-
-  // After finding a matching preset, update note configuration
+  // If no preset found, continue with URL parameter handling
   if (window.location.search) {
     const params = new QueryData(window.location.search, true);
     updateNoteConfigFromPreset(params);
@@ -1273,56 +1244,3 @@ function handleCentralOctaveChange(): void {
     drawGrid();
   }
 }
-
-// Add color saturation adjustment function
-function adjustColorSaturation(hexColor: string, saturationFactor: number): string {
-  // Convert hex to HSL
-  const r = parseInt(hexColor.slice(1, 3), 16) / 255;
-  const g = parseInt(hexColor.slice(3, 5), 16) / 255;
-  const b = parseInt(hexColor.slice(5, 7), 16) / 255;
-
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    
-    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
-    else if (max === g) h = (b - r) / d + 2;
-    else if (max === b) h = (r - g) / d + 4;
-    
-    h /= 6;
-  }
-
-  // Adjust saturation
-  s *= saturationFactor;
-
-  // Convert back to RGB
-  function hue2rgb(p: number, q: number, t: number): number {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q - p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-    return p;
-  }
-
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-
-  const newR = hue2rgb(p, q, h + 1/3);
-  const newG = hue2rgb(p, q, h);
-  const newB = hue2rgb(p, q, h - 1/3);
-
-  // Convert back to hex
-  const toHex = (n: number) => {
-    const hex = Math.round(n * 255).toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
-  };
-
-  return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
-} 
