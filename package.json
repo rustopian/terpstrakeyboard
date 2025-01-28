@@ -1,0 +1,21 @@
+{
+  "name": "terpstrakeyboard",
+  "version": "1.0.0",
+  "description": "[Homepage](http://terpstrakeyboard.com/)",
+  "main": "QueryData.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "@types/webmidi": "^2.1.0",
+    "typescript": "^5.3.3",
+    "vite": "^4.5.1"
+  }
+}
