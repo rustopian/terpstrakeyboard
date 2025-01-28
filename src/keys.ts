@@ -501,45 +501,43 @@ function resizeHandler(): void {
   drawGrid();
 }
 
-function back(): void {
-  // Remove key listener
-  removeEventHandlers();
+function showSettings(): void {
+  const overlay = document.querySelector('.modal-overlay');
+  const landingPage = document.getElementById('landing-page');
+  const settingsButton = document.getElementById('settings-button');
   
-  // Stop all active notes
-  if (settings && settings.activeHexObjects) {
-    while (settings.activeHexObjects.length > 0) {
-      const coords = settings.activeHexObjects[0].coords;
-      settings.activeHexObjects[0].noteOff();
-      drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
-      settings.activeHexObjects.splice(0, 1);
-    }
-  }
+  if (overlay) overlay.classList.add('active');
+  if (landingPage) landingPage.style.display = 'block';
+  if (settingsButton) settingsButton.style.display = 'none';
   
-  if (myOutput) {
-    myOutput.sendAllSoundOff();
-  }
-  
-  // UI change
-  const keyboardElement = document.getElementById("keyboard");
-  const backButton = document.getElementById("backButton");
-  const landingPage = document.getElementById("landing-page");
+  document.body.style.overflow = 'hidden';
+}
 
-  if (keyboardElement) keyboardElement.style.display = "none";
-  if (backButton) backButton.style.display = "none";
-  if (landingPage) landingPage.style.display = "block";
+function hideSettings(): void {
+  const overlay = document.querySelector('.modal-overlay');
+  const landingPage = document.getElementById('landing-page');
+  const settingsButton = document.getElementById('settings-button');
   
-  document.body.style.overflow = 'scroll';
+  if (overlay) overlay.classList.remove('active');
+  if (landingPage) landingPage.style.display = 'none';
+  if (settingsButton) settingsButton.style.display = 'block';
+  
+  document.body.style.overflow = 'hidden';
+}
+
+// Modify the back function to use the new modal behavior
+function back(): void {
+  showSettings();
 }
 
 function goKeyboard(): boolean {
   changeURL();
   console.log("[DEBUG] Starting goKeyboard...");
 
-  // Set up screen
-  document.getElementById("landing-page")!.style.display = "none";
-  document.getElementById("keyboard")!.style.display = "block";
-  document.getElementById("backButton")!.style.display = "block";
-  document.body.style.overflow = 'hidden';
+  // Hide settings and show keyboard
+  hideSettings();
+  const keyboard = document.getElementById("keyboard");
+  if (keyboard) keyboard.style.display = "block";
 
   // Initialize audio context if not already initialized
   if (!settings.audioContext) {
@@ -626,6 +624,16 @@ window.addEventListener('load', () => {
     console.log("[DEBUG] Audio context initialized on load:", ctx.state);
   }
   
+  // Add settings button handler
+  document.getElementById('settings-button')?.addEventListener('click', showSettings);
+  
+  // Add click handler to close modal when clicking overlay
+  document.querySelector('.modal-overlay')?.addEventListener('click', (event) => {
+    if (event.target === event.currentTarget) {
+      hideSettings();
+    }
+  });
+  
   // Add MIDI input checkbox handler
   document.getElementById('midi_input')?.addEventListener('change', (event) => {
     const checkbox = event.target as HTMLInputElement;
@@ -649,15 +657,24 @@ window.addEventListener('load', () => {
       }
     }
   });
-
-  // Initialize keyboard if URL has parameters
-  if (init_keyboard_onload) {
-    document.getElementById('landing-page')!.style.display = 'none';
+  
+  // Initialize keyboard immediately if URL has parameters, otherwise show settings
+  if (window.location.search) {
+    const keyboard = document.getElementById("keyboard");
+    const landingPage = document.getElementById("landing-page");
+    const settingsButton = document.getElementById("settings-button");
+    
+    if (keyboard) keyboard.style.display = "block";
+    if (landingPage) landingPage.style.display = "none";
+    if (settingsButton) settingsButton.style.display = "block";
+    
     const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
     if (instrumentSelect) {
       instrumentSelect.value = getData.instrument ?? "organ";
     }
     setTimeout(() => { goKeyboard(); }, 1500);
+  } else {
+    showSettings();
   }
 }, false);
 
@@ -721,23 +738,49 @@ function populatePresetDropdown(): void {
     groupPresets.forEach(preset => {
       const option = document.createElement('option');
       option.text = preset.label;
-      
-      // Convert preset parameters to URL format
-      const params = new URLSearchParams();
-      Object.entries(preset.parameters).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          params.append(key, value.join('\n'));
-        } else {
-          params.append(key, value);
-        }
-      });
-      
-      option.value = '?' + params.toString();
+      option.value = JSON.stringify(preset.parameters); // Store parameters directly
       optgroup.appendChild(option);
     });
 
     quicklinks.appendChild(optgroup);
   });
+
+  // Add change handler to update form values without immediate navigation
+  quicklinks.addEventListener('change', (event) => {
+    const select = event.target as HTMLSelectElement;
+    if (select.selectedIndex > 0) { // If not "Choose Preset"
+      try {
+        const parameters = JSON.parse(select.value);
+        
+        // Update all form fields with preset values
+        Object.entries(parameters).forEach(([key, value]) => {
+          const element = document.getElementById(key) as HTMLInputElement;
+          if (element) {
+            if (element.type === 'checkbox') {
+              element.checked = value === 'true';
+            } else if (Array.isArray(value)) {
+              element.value = value.join('\n');
+            } else {
+              element.value = value as string;
+            }
+          }
+        });
+
+        // Update URL without navigation
+        changeURL();
+        
+        // Trigger UI updates
+        hideRevealNames();
+        hideRevealColors();
+        hideRevealEnum();
+      } catch (error) {
+        console.error('Error applying preset:', error);
+      }
+    }
+  });
+
+  // Check current URL to set initial selection
+  checkPreset(16);
 }
 
 // Modify checkPreset to work with JSON presets
@@ -746,6 +789,7 @@ function checkPreset(init: number): void {
   if (!mselect) return;
 
   const url_str = window.location.href;
+  let presetFound = false;
 
   // First check for .htm as end of url and set the default preset
   if (url_str.substr(url_str.length - 4) === '.htm') {
@@ -753,6 +797,7 @@ function checkPreset(init: number): void {
     for (let i = 0; i < mselect.options.length; i++) {
       if (mselect.options[i].text === "31-ed2 Bosanquet / Wilson / Terpstra") {
         mselect.value = mselect.options[i].value;
+        presetFound = true;
         // Trigger the onchange event to load the preset
         const event = new Event('change');
         mselect.dispatchEvent(event);
@@ -761,12 +806,48 @@ function checkPreset(init: number): void {
     }
   }
 
-  // Find matching preset from URL
-  for (let i = 0; i < mselect.options.length; i++) {
-    if (url_str.indexOf(mselect.options[i].value) !== -1) {
-      mselect.value = mselect.options[i].value;
-      break;
+  // Find matching preset from URL parameters
+  if (!presetFound && window.location.search) {
+    const currentParams = new URLSearchParams(window.location.search);
+    
+    // Try to find a matching preset
+    for (let i = 0; i < mselect.options.length; i++) {
+      if (mselect.options[i].value) {
+        const presetParams = new URLSearchParams(mselect.options[i].value.substring(1)); // Remove leading '?'
+        let matches = true;
+        
+        // Compare relevant parameters
+        const paramsToCheck = ['fundamental', 'right', 'upright', 'size', 'rotation', 'instrument', 
+                             'enum', 'equivSteps', 'spectrum_colors', 'no_labels'];
+        
+        for (const param of paramsToCheck) {
+          if (currentParams.get(param) !== presetParams.get(param)) {
+            matches = false;
+            break;
+          }
+        }
+        
+        // Check array parameters separately (they might be encoded differently)
+        ['scale', 'names', 'note_colors'].forEach(param => {
+          const currentValue = currentParams.get(param);
+          const presetValue = presetParams.get(param);
+          if (currentValue !== presetValue) {
+            matches = false;
+          }
+        });
+        
+        if (matches) {
+          mselect.value = mselect.options[i].value;
+          presetFound = true;
+          break;
+        }
+      }
     }
+  }
+
+  // If no matching preset was found, select the "Choose Preset" option
+  if (!presetFound) {
+    mselect.selectedIndex = 0;
   }
 }
 

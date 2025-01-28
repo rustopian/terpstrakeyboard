@@ -20,8 +20,9 @@
 </head>
 
 <body style="overflow: scroll;">
-
-	<div id="landing-page" class="section" style="display: block;">
+	<div class="modal-overlay"></div>
+	
+	<div id="landing-page" class="section modal">
 		<div class="container">
 		  <h2><a href="http://terpstrakeyboard.com/">Terpstra Keyboard</a> <a href="http://terpstrakeyboard.com/play-it-now/">WebApp</a></h2>
 		  <div class="row">
@@ -29,103 +30,29 @@
           </div>
 
 			<form id="settingsForm">
-				<div class="row">
-					<div class="one-half column thincol-parent">
-						<div class="u-half-width rpad">
-
-                          <label>Tuning\Layout Quick Links</label>
-                          <select id="quicklinks" onchange="javascript:location.href = this.value;" class="u-full-width">
-                              <option selected="selected" disabled="disabled">Choose Preset</option>
-                          </select>
-
-                          <label>Fundamental (Hz)</label>
-                          <input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="changeURL();noPreset();" class="u-full-width">
-                       </div>
-
-						<div class="u-half-width">
-
-                          <label>Right Facing Steps</label>
-                          <input id="rSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
-
-                          <label>Up/Right Facing Steps</label>
-                          <input id="urSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
-						</div>
-                    </div>
-
-					<div class="one-half column thincol-parent">
-						<div class="u-half-width rpad">
-
-                          <label>Hex Size (pixels)</label>
-                          <input id="hexSize" type="number" step="any" min="20" max="1000" onchange="changeURL();noPreset();" class="u-full-width">
-
-                          <label>Rotation (degrees)</label>
-                          <input id="rotation" type="number" step="any" min="0" max="360" value="343.897886248" onchange="changeURL();noPreset();" class="u-full-width">
-						</div>
-
-						<div class="u-half-width">
-
-                          <label>Instrument</label>
-                          <select id="instrument" onchange="changeURL();noPreset();"  class="u-full-width">
-                            <optgroup label="Regular">
-                                <option value="piano">Piano</option>
-                                <option value="harpsichord">Harpsichord</option>
-                                <option value="rhodes">Rhodes</option>
-                                <option value="harp">Harp</option>
-                                <option value="choir">Choir</option>
-                                <option value="strings">Strings</option>
-                                <option value="sawtooth">Sawtooth</option>
-                                <option value="gayageum">Gayageum</option>
-                                <option value="qanun">Qanun</option>
-                                <option value="organ">Organ</option>
-                                <option value="organleslie">Organ + Leslie</option>
-                                <option value="marimba">Marimba</option>
-                                <option value="musicbox">Music Box</option>
-                            </optgroup>
-                            <optgroup label="«What Music Really İs» Study Tones">
-                                <option value="WMRI3LST">WMRİ 3-Limit (4 Harmonics) ST</option>
-                                <option value="WMRI5LST">WMRİ 5-Limit (6 Harmonics) ST</option>
-                                <option value="WMRI5Lpike">WMRİ 5-Limit (6 Harmonics) Pk</option>
-                                <option value="WMRI7LST">WMRİ 7-Limit (10 Harmonics) ST</option>
-                                <option value="WMRI11LST">WMRİ 11-Limit (12 Harmonics) ST</option>
-                                <option value="WMRI13LST">WMRİ 13-Limit (16 Harmonics) ST</option>
-                                <option value="WMRInLST">WMRİ n-Limit ("sawtooth wave") ST</option>
-                                <option value="WMRIByzantineST">WMRİ Byzantine (9 Harmonics) ST</option>
-                                <option value="WMRI-in6-har7-">WMRİ Stretch inharmonic 6 = harmonic 7</option>
-                                <option value="WMRI-in7-har6-">WMRİ Compress inharmonic 7 = harmonic 6</option>
-                            </optgroup>
-                          </select>
-
-                          <label>
-                              <input id="enum" type="checkbox" name="number_or_name" value="fnord" onchange="hideRevealNames();noPreset();">
-                              <span class="label-body">Enumerate Scale</span>
-                          </label>
-
-                          <label>
-                              <input id="spectrum_colors" type="checkbox" name="spectrum_colors" value="fnord" onchange="hideRevealColors();noPreset();">
-                              <span class="label-body">Use Spectrum Colors</span>
-                          </label>
-
-                          <label>
-                              <input id="no_labels" type="checkbox" name="blank_keys" value="fnord" onchange="hideRevealEnum();noPreset();">
-                              <span class="label-body">Blank Keys</span>
-                          </label>
-
-                          <label>
-                              <input id="midi_input" type="checkbox" name="midi_input" value="fnord" onchange="changeURL();noPreset();">
-                              <span class="label-body">Enable MIDI Input</span>
-                          </label>
-						</div>
-					</div>
+				<div class="tabs">
+					<button type="button" class="tab-button active" data-tab="tuning">Tuning</button>
+					<button type="button" class="tab-button" data-tab="layout">Layout</button>
+					<button type="button" class="tab-button" data-tab="appearance">Appearance</button>
+					<button type="button" class="tab-button" data-tab="credits">Credits</button>
 				</div>
 
-                <div class="row">
-                    <img alt="" src="images/1x1.png" style="margin: 1.5%">
-                </div>
+				<!-- Tuning Tab -->
+				<div id="tuning" class="tab-content active">
+					<div class="row">
+						<div class="one-half column">
+							<label>Tuning\Layout Quick Links</label>
+							<select id="quicklinks" class="u-full-width">
+								<option selected="selected" disabled="disabled">Choose Preset</option>
+							</select>
 
-				<div class="row">
-					<div class="one-half column pushrow-mobile">
-						<label>Scale (<a href="http://www.huygens-fokker.org/scala/scl_format.html" target="new" style="color: #222; text-decoration: none;">Scala format</a>)</label>
-						<textarea id="scale" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">! 31-ed2 Bosanquet Wilson Terpstra.scl
+							<label>Fundamental (Hz)</label>
+							<input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="changeURL();noPreset();" class="u-full-width">
+						</div>
+						
+						<div class="one-half column">
+							<label>Scale (<a href="http://www.huygens-fokker.org/scala/scl_format.html" target="new" style="color: #222; text-decoration: none;">Scala format</a>)</label>
+							<textarea id="scale" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">! 31-ed2 Bosanquet Wilson Terpstra.scl
 ! 31-tone equal tempered scale consisting of 31 sonically equal divisions per frequency halving/doubling in standard meantone notation, mapped on a Bosanquet / Wilson / Terpstra layout.
 !
 Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
@@ -162,15 +89,98 @@ Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
 1122.58065
 1161.29032
 1200.00000</textarea>
-                  </div>
+						</div>
+					</div>
+				</div>
 
-                  <div class="one-half column thincol-parent">
-                    <div class="u-half-width rpad">
-                      <label id="numberLabel" style="display: block;">Steps To Equivalence Interval</label>
-                      <input id="equivSteps" type="number" min="1" max="999" value="" onchange="changeURL();noPreset();" style="display: block;" class="u-full-width">
+				<!-- Layout Tab -->
+				<div id="layout" class="tab-content">
+					<div class="row">
+						<div class="one-half column thincol-parent">
+							<div class="u-half-width rpad">
+								<label>Right Facing Steps</label>
+								<input id="rSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
 
-                      <label id="namesLabel" style="display: none;">Note Names</label>
-                      <textarea id="names" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12" style="display: none;">C
+								<label>Up/Right Facing Steps</label>
+								<input id="urSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
+							</div>
+
+							<div class="u-half-width">
+								<label>Hex Size (pixels)</label>
+								<input id="hexSize" type="number" step="any" min="20" max="1000" onchange="changeURL();noPreset();" class="u-full-width">
+
+								<label>Rotation (degrees)</label>
+								<input id="rotation" type="number" step="any" min="0" max="360" value="343.897886248" onchange="changeURL();noPreset();" class="u-full-width">
+							</div>
+						</div>
+
+						<div class="one-half column">
+							<label>Instrument</label>
+							<select id="instrument" onchange="changeURL();noPreset();" class="u-full-width">
+								<optgroup label="Regular">
+									<option value="piano">Piano</option>
+									<option value="harpsichord">Harpsichord</option>
+									<option value="rhodes">Rhodes</option>
+									<option value="harp">Harp</option>
+									<option value="choir">Choir</option>
+									<option value="strings">Strings</option>
+									<option value="sawtooth">Sawtooth</option>
+									<option value="gayageum">Gayageum</option>
+									<option value="qanun">Qanun</option>
+									<option value="organ">Organ</option>
+									<option value="organleslie">Organ + Leslie</option>
+									<option value="marimba">Marimba</option>
+									<option value="musicbox">Music Box</option>
+								</optgroup>
+								<optgroup label="«What Music Really İs» Study Tones">
+									<option value="WMRI3LST">WMRİ 3-Limit (4 Harmonics) ST</option>
+									<option value="WMRI5LST">WMRİ 5-Limit (6 Harmonics) ST</option>
+									<option value="WMRI5Lpike">WMRİ 5-Limit (6 Harmonics) Pk</option>
+									<option value="WMRI7LST">WMRİ 7-Limit (10 Harmonics) ST</option>
+									<option value="WMRI11LST">WMRİ 11-Limit (12 Harmonics) ST</option>
+									<option value="WMRI13LST">WMRİ 13-Limit (16 Harmonics) ST</option>
+									<option value="WMRInLST">WMRİ n-Limit ("sawtooth wave") ST</option>
+									<option value="WMRIByzantineST">WMRİ Byzantine (9 Harmonics) ST</option>
+									<option value="WMRI-in6-har7-">WMRİ Stretch inharmonic 6 = harmonic 7</option>
+									<option value="WMRI-in7-har6-">WMRİ Compress inharmonic 7 = harmonic 6</option>
+								</optgroup>
+							</select>
+
+							<label>
+								<input id="midi_input" type="checkbox" name="midi_input" value="fnord" onchange="changeURL();noPreset();">
+								<span class="label-body">Enable MIDI Input</span>
+							</label>
+						</div>
+					</div>
+				</div>
+
+				<!-- Appearance Tab -->
+				<div id="appearance" class="tab-content">
+					<div class="row">
+						<div class="one-half column">
+							<label>
+								<input id="enum" type="checkbox" name="number_or_name" value="fnord" onchange="hideRevealNames();noPreset();">
+								<span class="label-body">Enumerate Scale</span>
+							</label>
+
+							<label>
+								<input id="spectrum_colors" type="checkbox" name="spectrum_colors" value="fnord" onchange="hideRevealColors();noPreset();">
+								<span class="label-body">Use Spectrum Colors</span>
+							</label>
+
+							<label>
+								<input id="no_labels" type="checkbox" name="blank_keys" value="fnord" onchange="hideRevealEnum();noPreset();">
+								<span class="label-body">Blank Keys</span>
+							</label>
+						</div>
+
+						<div class="one-half column thincol-parent">
+							<div class="u-half-width rpad">
+								<label id="numberLabel">Steps To Equivalence Interval</label>
+								<input id="equivSteps" type="number" min="1" max="999" onchange="changeURL();noPreset();" class="u-full-width">
+
+								<label id="namesLabel" style="display: none;">Note Names</label>
+								<textarea id="names" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12" style="display: none;">C
 D♭♭
 C♯
 D♭
@@ -201,14 +211,14 @@ A×
 B
 C♭
 B♯</textarea>
-					</div>
+							</div>
 
-                    <div class="u-half-width">
-                        <label id="fundamental_colorLabel" style="display: none;">Fundamental Color</label>
-                        <input type="text" id="fundamental_color" style="display: none;" class="jscolor u-full-width" value="#55ff55">
+							<div class="u-half-width">
+								<label id="fundamental_colorLabel" style="display: none;">Fundamental Color</label>
+								<input type="text" id="fundamental_color" style="display: none;" class="jscolor u-full-width" value="#55ff55">
 
-                        <label id="note_colorsLabel">Color Layout</label>
-                        <textarea id="note_colors" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">ffffff
+								<label id="note_colorsLabel">Color Layout</label>
+								<textarea id="note_colors" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">ffffff
 ff9f41
 cfcfcf
 bbaa93
@@ -240,16 +250,24 @@ ffffff
 bbaa93
 cfcfcf
 ffffff</textarea>
-                    </div>
-                  </div>
+							</div>
+						</div>
+					</div>
 				</div>
-				<br>
-				<input name="Submit" type="submit" value="Make me a microtonal keyboard!">
-            </form>
-        </div>
 
-		<div class="container" style="text-align:center">
-          Designed by <a href="http://siementerpstra.com/" target="new">Siemen Terpstra</a> in the late '80's. WebApp developed by <a href="http://jamesfenn.com/" target="new">James Fenn</a> with additions and modifications by <a href="http://brandlew.com/" target="new">Brandon Lewis</a>, <a href="http://whatmusicreallyis.com/" title="What Music Really İs" target="new">Bo Constantinsen</a> and <a href="https://sites.google.com/site/wangchengu/" target="new">Chengu Wang</a>. Credits to Scott Thompson and <a href="http://ozanyarman.com/" target="new">Dr Ozan Yarman</a> for contributing samples. Current version 1.4 (Jan. 2015 — Mar. 2018), released as Free/Libre and Open Source Software under <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" target="new">GPL-3.0</a>. Download, fork, and get your name down here by fixing issues and implementing features via <a href="https://github.com/wcgbg/terpstrakeyboard/" target="new">GitHub</a>!
+				<!-- Credits Tab -->
+				<div id="credits" class="tab-content">
+					<div class="row">
+						<div class="container" style="text-align:center">
+							Designed by <a href="http://siementerpstra.com/" target="new">Siemen Terpstra</a> in the late '80's. WebApp developed by <a href="http://jamesfenn.com/" target="new">James Fenn</a> with additions and modifications by <a href="http://brandlew.com/" target="new">Brandon Lewis</a>, <a href="http://whatmusicreallyis.com/" title="What Music Really İs" target="new">Bo Constantinsen</a> and <a href="https://sites.google.com/site/wangchengu/" target="new">Chengu Wang</a>. Credits to Scott Thompson and <a href="http://ozanyarman.com/" target="new">Dr Ozan Yarman</a> for contributing samples. Current version 1.4 (Jan. 2015 — Mar. 2018), released as Free/Libre and Open Source Software under <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" target="new">GPL-3.0</a>. Download, fork, and get your name down here by fixing issues and implementing features via <a href="https://github.com/wcgbg/terpstrakeyboard/" target="new">GitHub</a>!
+						</div>
+					</div>
+				</div>
+
+				<div class="row" style="margin-top: 20px;">
+					<input name="Submit" type="submit" value="Save" class="button-primary">
+				</div>
+			</form>
 		</div>
 	</div>
 
@@ -257,4 +275,20 @@ ffffff</textarea>
 
 	<img alt="Return to keyboard design" src="images/back.png" id="backButton" onclick="back()" style="display: none;">
 
+	<button id="settings-button" class="settings-button">Settings</button>
+
+	<script>
+		// Add tab functionality
+		document.querySelectorAll('.tab-button').forEach(button => {
+			button.addEventListener('click', () => {
+				// Remove active class from all buttons and content
+				document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+				document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+				
+				// Add active class to clicked button and corresponding content
+				button.classList.add('active');
+				document.getElementById(button.dataset.tab)?.classList.add('active');
+			});
+		});
+	</script>
 </body></html>
