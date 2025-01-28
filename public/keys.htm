@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-	<title>Terpstra Keyboard WebApp</title>
+	<title>Temper</title>
 
 	<meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, target-densitydpi=device-dpi">
 	<meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,21 +24,21 @@
 	
 	<div id="landing-page" class="section modal">
 		<div class="container">
-		  <h2><a href="http://terpstrakeyboard.com/">Terpstra Keyboard</a> <a href="http://terpstrakeyboard.com/play-it-now/">WebApp</a></h2>
+		  <h2>Temper</h2>
 		  <div class="row">
               <img alt="" src="images/1x1.png">
           </div>
 
 			<form id="settingsForm">
 				<div class="tabs">
-					<button type="button" class="tab-button active" data-tab="tuning">Tuning</button>
-					<button type="button" class="tab-button" data-tab="layout">Layout</button>
-					<button type="button" class="tab-button" data-tab="appearance">Appearance</button>
+					<button type="button" class="tab-button active" data-tab="audio">Audio</button>
+					<button type="button" class="tab-button" data-tab="layout">Layout & Display</button>
+					<button type="button" class="tab-button" data-tab="advanced">Advanced</button>
 					<button type="button" class="tab-button" data-tab="credits">Credits</button>
 				</div>
 
-				<!-- Tuning Tab -->
-				<div id="tuning" class="tab-content active">
+				<!-- Audio Tab -->
+				<div id="audio" class="tab-content active">
 					<div class="row">
 						<div class="one-half column">
 							<label>Tuning\Layout Quick Links</label>
@@ -46,74 +46,28 @@
 								<option selected="selected" disabled="disabled">Choose Preset</option>
 							</select>
 
-							<label>Fundamental (Hz)</label>
-							<input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="changeURL();noPreset();" class="u-full-width">
+							<div class="pitch-input-group">
+								<label>Reference Pitch</label>
+								<div class="pitch-controls">
+									<select id="pitch-type" class="u-half-width">
+										<option value="fundamental">Fundamental (Hz)</option>
+										<option value="A4">A4 (Hz)</option>
+									</select>
+									<input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="changeURL();noPreset();" class="u-half-width">
+								</div>
+							</div>
+
+							<label>Central Octave</label>
+							<input type="range" id="central-octave" min="-2" max="2" value="0" class="u-full-width">
+							<div class="range-labels">
+								<span>-2</span>
+								<span>-1</span>
+								<span>0</span>
+								<span>+1</span>
+								<span>+2</span>
+							</div>
 						</div>
 						
-						<div class="one-half column">
-							<label>Scale (<a href="http://www.huygens-fokker.org/scala/scl_format.html" target="new" style="color: #222; text-decoration: none;">Scala format</a>)</label>
-							<textarea id="scale" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">! 31-ed2 Bosanquet Wilson Terpstra.scl
-! 31-tone equal tempered scale consisting of 31 sonically equal divisions per frequency halving/doubling in standard meantone notation, mapped on a Bosanquet / Wilson / Terpstra layout.
-!
-Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
-31
-!
-38.70968
-77.41935
-116.12903
-154.83871
-193.54839
-232.25806
-270.96774
-309.67742
-348.38710
-387.09677
-425.80645
-464.51613
-503.22581
-541.93548
-580.64516
-619.35484
-658.06452
-696.77419
-735.48387
-774.19355
-812.90323
-851.61290
-890.32258
-929.03226
-967.74194
-1006.45161
-1045.16129
-1083.87097
-1122.58065
-1161.29032
-1200.00000</textarea>
-						</div>
-					</div>
-				</div>
-
-				<!-- Layout Tab -->
-				<div id="layout" class="tab-content">
-					<div class="row">
-						<div class="one-half column thincol-parent">
-							<div class="u-half-width rpad">
-								<label>Right Facing Steps</label>
-								<input id="rSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
-
-								<label>Up/Right Facing Steps</label>
-								<input id="urSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
-							</div>
-
-							<div class="u-half-width">
-								<label>Hex Size (pixels)</label>
-								<input id="hexSize" type="number" step="any" min="20" max="1000" onchange="changeURL();noPreset();" class="u-full-width">
-
-								<label>Rotation (degrees)</label>
-								<input id="rotation" type="number" step="any" min="0" max="360" value="343.897886248" onchange="changeURL();noPreset();" class="u-full-width">
-							</div>
-						</div>
-
 						<div class="one-half column">
 							<label>Instrument</label>
 							<select id="instrument" onchange="changeURL();noPreset();" class="u-full-width">
@@ -154,103 +108,181 @@ Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
 					</div>
 				</div>
 
-				<!-- Appearance Tab -->
-				<div id="appearance" class="tab-content">
+				<!-- Layout & Display Tab -->
+				<div id="layout" class="tab-content">
 					<div class="row">
 						<div class="one-half column">
-							<label>
-								<input id="enum" type="checkbox" name="number_or_name" value="fnord" onchange="hideRevealNames();noPreset();">
-								<span class="label-body">Enumerate Scale</span>
-							</label>
+							<div class="layout-controls">
+								<label>Layout Settings</label>
+								<div class="control-group">
+									<label>Right Facing Steps</label>
+									<input id="rSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
+								</div>
 
-							<label>
-								<input id="spectrum_colors" type="checkbox" name="spectrum_colors" value="fnord" onchange="hideRevealColors();noPreset();">
-								<span class="label-body">Use Spectrum Colors</span>
-							</label>
+								<div class="control-group">
+									<label>Up/Right Facing Steps</label>
+									<input id="urSteps" type="number" min="-1220" max="1220" onchange="changeURL();noPreset();" class="u-full-width">
+								</div>
 
-							<label>
-								<input id="no_labels" type="checkbox" name="blank_keys" value="fnord" onchange="hideRevealEnum();noPreset();">
-								<span class="label-body">Blank Keys</span>
-							</label>
+								<div class="control-group">
+									<label>Hex Size (pixels)</label>
+									<input id="hexSize" type="number" step="any" min="20" max="1000" onchange="changeURL();noPreset();" class="u-full-width">
+								</div>
+
+								<div class="control-group">
+									<label>Rotation (degrees)</label>
+									<input id="rotation" type="number" step="any" min="0" max="360" value="343.897886248" onchange="changeURL();noPreset();" class="u-full-width">
+								</div>
+							</div>
 						</div>
 
-						<div class="one-half column thincol-parent">
-							<div class="u-half-width rpad">
-								<label id="numberLabel">Steps To Equivalence Interval</label>
-								<input id="equivSteps" type="number" min="1" max="999" onchange="changeURL();noPreset();" class="u-full-width">
+						<div class="one-half column">
+							<div class="display-controls">
+								<label>Display Settings</label>
+								<div class="control-group">
+									<label>
+										<input id="enum" type="checkbox" name="number_or_name" value="fnord" onchange="hideRevealNames();noPreset();">
+										<span class="label-body">Enumerate Scale</span>
+									</label>
+								</div>
 
-								<label id="namesLabel" style="display: none;">Note Names</label>
-								<textarea id="names" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12" style="display: none;">C
-D♭♭
-C♯
-D♭
-C×
+								<div class="control-group">
+									<label>
+										<input id="spectrum_colors" type="checkbox" name="spectrum_colors" value="fnord" onchange="hideRevealColors();noPreset();">
+										<span class="label-body">Use Spectrum Colors</span>
+									</label>
+								</div>
+
+								<div class="control-group">
+									<label>
+										<input id="no_labels" type="checkbox" name="blank_keys" value="fnord" onchange="hideRevealEnum();noPreset();">
+										<span class="label-body">Blank Keys</span>
+									</label>
+								</div>
+
+								<div class="control-group">
+									<label>Color Vision Mode</label>
+									<select id="color-vision-mode" class="u-full-width" onchange="updateColorVisionMode();">
+										<option value="normal">Normal Vision</option>
+										<option value="protanopia">Protanopia</option>
+										<option value="deuteranopia">Deuteranopia</option>
+										<option value="tritanopia">Tritanopia</option>
+									</select>
+								</div>
+
+								<div class="control-group">
+									<label>Color Saturation</label>
+									<input type="range" id="color-saturation" class="u-full-width" min="0" max="100" value="100" onchange="updateColorSaturation();">
+									<div class="range-labels">
+										<span>0%</span>
+										<span>50%</span>
+										<span>100%</span>
+									</div>
+								</div>
+
+								<div class="control-group">
+									<label>
+										<input id="invert-updown" type="checkbox" name="invert_updown" value="fnord" onchange="updateKeyboardDisplay();">
+										<span class="label-body">Invert Up/Down Colors</span>
+									</label>
+								</div>
+
+								<div id="note-config" class="note-config">
+									<label>Note Configuration</label>
+									<div class="row">
+										<div class="one-half column">
+											<label>Note Names</label>
+											<textarea id="names" class="u-full-width">C
+C#
 D
-E♭♭
-D♯
-E♭
-D×
+D#
 E
-F♭
-E♯
 F
-G♭♭
-F♯
-G♭
-F×
+F#
 G
-A♭♭
-G♯
-A♭
-G×
+G#
 A
-B♭♭
-A♯
-B♭
-A×
-B
-C♭
-B♯</textarea>
-							</div>
+A#
+B</textarea>
+										</div>
+										<div class="one-half column">
+											<label>Note Colors (hex)</label>
+											<textarea id="note_colors" class="u-full-width">55ff55
+ff5555
+55ff55
+ff5555
+55ff55
+55ff55
+ff5555
+55ff55
+ff5555
+55ff55
+ff5555
+55ff55</textarea>
+										</div>
+									</div>
+									<label>Preview</label>
+									<div class="note-buttons">
+										<!-- Note buttons will be added dynamically -->
+									</div>
+								</div>
 
-							<div class="u-half-width">
-								<label id="fundamental_colorLabel" style="display: none;">Fundamental Color</label>
-								<input type="text" id="fundamental_color" style="display: none;" class="jscolor u-full-width" value="#55ff55">
+								<div class="control-group" id="equivStepsGroup" style="display: none;">
+									<label id="numberLabel">Steps To Equivalence Interval</label>
+									<input id="equivSteps" type="number" min="1" max="999" onchange="changeURL();noPreset();" class="u-full-width">
+								</div>
 
-								<label id="note_colorsLabel">Color Layout</label>
-								<textarea id="note_colors" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">ffffff
-ff9f41
-cfcfcf
-bbaa93
-7b7b7b
-ffffff
-ff9f41
-cfcfcf
-bbaa93
-7b7b7b
-ffffff
-bbaa93
-cfcfcf
-ffffff
-ff9f41
-cfcfcf
-bbaa93
-7b7b7b
-ffffff
-ff9f41
-cfcfcf
-bbaa93
-7b7b7b
-ffffff
-ff9f41
-cfcfcf
-bbaa93
-7b7b7b
-ffffff
-bbaa93
-cfcfcf
-ffffff</textarea>
+								<div class="control-group" id="fundamentalColorGroup" style="display: none;">
+									<label id="fundamental_colorLabel">Fundamental Color</label>
+									<input type="text" id="fundamental_color" class="jscolor u-full-width" value="#55ff55">
+								</div>
 							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Advanced Tab -->
+				<div id="advanced" class="tab-content">
+					<div class="row">
+						<div class="column">
+							<label>Scale (<a href="http://www.huygens-fokker.org/scala/scl_format.html" target="new" style="color: #222; text-decoration: none;">Scala format</a>)</label>
+							<textarea id="scale" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">! 31-ed2 Bosanquet Wilson Terpstra.scl
+! 31-tone equal tempered scale consisting of 31 sonically equal divisions per frequency halving/doubling in standard meantone notation, mapped on a Bosanquet / Wilson / Terpstra layout.
+!
+Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
+31
+!
+38.70968
+77.41935
+116.12903
+154.83871
+193.54839
+232.25806
+270.96774
+309.67742
+348.38710
+387.09677
+425.80645
+464.51613
+503.22581
+541.93548
+580.64516
+619.35484
+658.06452
+696.77419
+735.48387
+774.19355
+812.90323
+851.61290
+890.32258
+929.03226
+967.74194
+1006.45161
+1045.16129
+1083.87097
+1122.58065
+1161.29032
+1200.00000</textarea>
 						</div>
 					</div>
 				</div>

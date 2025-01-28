@@ -17,6 +17,7 @@ interface Settings {
   scale: number[];
   names: string[];
   no_labels: boolean;
+  invert_updown: boolean;
 }
 
 let settings: Settings;
@@ -158,8 +159,9 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
     //convert the hex to rgb
     returnColor = hex2rgb(returnColor);
 
-    //darken for pressed key
-    if (pressed) {
+    //darken for pressed key (or unpressed if inverted)
+    const shouldDarken = settings.invert_updown ? !pressed : pressed;
+    if (shouldDarken) {
       returnColor[0] = Math.max(0, returnColor[0] - 90);
       returnColor[1] = Math.max(0, returnColor[1] - 90);
       returnColor[2] = Math.max(0, returnColor[2] - 90);
@@ -179,7 +181,9 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
   if (reduced < 0) reduced += 1;
   h = (reduced + h) % 1;
 
-  const finalV = pressed ? v - (v / 2) : v;
+  // Invert the pressed state if invert_updown is true
+  const shouldDarken = settings.invert_updown ? !pressed : pressed;
+  const finalV = shouldDarken ? v - (v / 2) : v;
 
   returnColor = HSVtoRGB(h, s, finalV);
 

@@ -129,20 +129,21 @@ select#quicklinks {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 10px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 15px;
 }
 
 .tab-button {
   background: none;
   border: none;
-  padding: 10px 20px;
+  padding: 12px 24px;
   cursor: pointer;
   font-size: 16px;
   border-radius: 5px;
   color: #555;
   transition: all 0.3s ease;
+  margin-bottom: -2px;
 }
 
 .tab-button:hover {
@@ -163,35 +164,89 @@ select#quicklinks {
   display: block;
 }
 
+.pitch-input-group {
+  margin-bottom: 20px;
+}
+
+.pitch-controls {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  color: #666;
+  font-size: 14px;
+}
+
+.control-group {
+  margin-bottom: 15px;
+}
+
+.note-config {
+  margin-top: 20px;
+}
+
+.note-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+.note-button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  text-align: center;
+  font-size: 14px;
+  color: #000;
+  cursor: default;
+}
+
+.note-button:disabled {
+  opacity: 1;
+}
+
+/* Improve mobile responsiveness */
 @media screen and (max-width: 768px) {
   .tabs {
     flex-direction: column;
     gap: 5px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
   }
 
   .tab-button {
     width: 100%;
     text-align: left;
+    padding: 10px 15px;
   }
 
-  .one-half.column {
+  .pitch-controls {
+    flex-direction: column;
+  }
+
+  .pitch-controls select,
+  .pitch-controls input {
     width: 100%;
-    margin-left: 0;
   }
 
-  .u-half-width {
-    width: 100%;
-    float: none;
+  .note-buttons {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   }
 
-  .rpad {
-    margin-right: 0;
-    margin-bottom: 20px;
-  }
-
-  #landing-page.modal {
-    width: 95%;
-    max-height: 95vh;
-    padding: 15px;
+  .note-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 300px;
   }
 }

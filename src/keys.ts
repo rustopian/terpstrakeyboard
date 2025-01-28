@@ -33,6 +33,9 @@ import {
 // Import query data
 import { QueryData } from './QueryData';
 
+// Import color transformation functions
+import { transformColorsForCVD, ColorVisionType } from './colorTransform';
+
 // Type definitions
 interface Instrument {
   fileName: string;
@@ -92,6 +95,9 @@ interface Settings {
   activeSources: { [key: number]: { source: AudioBufferSourceNode; gainNode: GainNode } };
   fadeoutTime: number;
   sampleBuffer: (AudioBuffer | undefined)[];
+  colorVisionMode: ColorVisionType;
+  colorSaturation: number;
+  invert_updown: boolean;
 }
 
 // Add WebMidi types
@@ -101,6 +107,9 @@ declare global {
     back: () => void;
     changeURL: () => void;
     noPreset: () => void;
+    hideRevealColors: () => void;
+    hideRevealNames: () => void;
+    hideRevealEnum: () => void;
     WebMidi: {
       enable: () => Promise<void>;
       disable: () => void;
@@ -108,6 +117,8 @@ declare global {
       outputs: WebMidiOutput[];
       getOutputByName: (name: string) => WebMidiOutput;
     };
+    updateColorVisionMode: () => void;
+    updateColorSaturation: () => void;
   }
 
   interface WebMidiOutput {
@@ -183,14 +194,31 @@ let settings: Settings = {
   audioBuffer: undefined,
   activeSources: {},
   fadeoutTime: 0,
-  sampleBuffer: [undefined, undefined, undefined, undefined]
+  sampleBuffer: [undefined, undefined, undefined, undefined],
+  colorVisionMode: 'normal',
+  colorSaturation: 100,
+  invert_updown: false,
 };
 
-// Make back function available globally
+// Add color saturation update function
+function updateColorSaturation(): void {
+  const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
+  if (saturationSlider) {
+    settings.colorSaturation = parseInt(saturationSlider.value);
+    updateKeyboardDisplay();
+  }
+}
+
+// Make functions available globally
 window.back = back;
 window.settings = settings;
 window.changeURL = changeURL;
 window.noPreset = noPreset;
+window.hideRevealColors = hideRevealColors;
+window.hideRevealNames = hideRevealNames;
+window.hideRevealEnum = hideRevealEnum;
+window.updateColorVisionMode = updateColorVisionMode;
+window.updateColorSaturation = updateColorSaturation;
 
 if (window.WebMidi) {
   // Only enable WebMidi if the checkbox is checked
@@ -293,6 +321,7 @@ setInputValue("equivSteps", 31);
 setInputValue("spectrum_colors", false);
 setInputValue("fundamental_color", '#55ff55');
 setInputValue("no_labels", false);
+setInputValue("invert-updown", false);
 
 if ("scale" in getData && getData.scale) {
   const scaleElement = document.getElementById("scale") as HTMLInputElement;
@@ -319,6 +348,20 @@ hideRevealNames();
 hideRevealColors();
 hideRevealEnum();
 
+function updateKeyboardDisplay(): void {
+  // Update all the settings
+  settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
+  settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement).checked;
+  settings.enum = (document.getElementById('enum') as HTMLInputElement).checked;
+  settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
+  settings.names = (document.getElementById('names') as HTMLInputElement).value.split('\n');
+  settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
+  parseScaleColors();
+  
+  // Redraw the grid
+  drawGrid();
+}
+
 function hideRevealNames(): void {
   const enumCheckbox = document.getElementById("enum") as HTMLInputElement;
   const equivStepsElement = document.getElementById("equivSteps") as HTMLElement;
@@ -338,6 +381,7 @@ function hideRevealNames(): void {
     if (namesLabel) namesLabel.style.display = 'block';
   }
   changeURL();
+  updateKeyboardDisplay();
 }
 
 function hideRevealColors(): void {
@@ -359,6 +403,7 @@ function hideRevealColors(): void {
     if (noteColorsLabel) noteColorsLabel.style.display = 'block';
   }
   changeURL();
+  updateKeyboardDisplay();
 }
 
 function hideRevealEnum(): void {
@@ -388,6 +433,7 @@ function hideRevealEnum(): void {
     }
   }
   changeURL();
+  updateKeyboardDisplay();
 }
 
 function changeURL(): void {
@@ -402,7 +448,7 @@ function changeURL(): void {
   const params = [
     "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
     "instrument", "enum", "equivSteps", "spectrum_colors",
-    "fundamental_color", "no_labels", "midi_input"
+    "fundamental_color", "no_labels", "midi_input", "invert-updown"
   ];
 
   url += params.map(param => `${param}=${getElementValue(param)}`).join('&');
@@ -462,8 +508,12 @@ function parseScaleColors(): void {
   const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
   if (!noteColorsElement) return;
 
-  const colorsArray = noteColorsElement.value.split('\n');
-  settings.keycolors = colorsArray;
+  const originalColors = noteColorsElement.value.split('\n').map(c => `#${c}`);
+  
+  // Apply saturation adjustment before color vision transformation
+  const saturatedColors = originalColors.map(color => adjustColorSaturation(color, settings.colorSaturation / 100));
+  const transformedColors = transformColorsForCVD(saturatedColors, settings.colorVisionMode);
+  settings.keycolors = transformedColors.map(c => c.substring(1));
 }
 
 function resizeHandler(): void {
@@ -676,6 +726,21 @@ window.addEventListener('load', () => {
   } else {
     showSettings();
   }
+
+  // Initialize note configuration
+  initNoteConfig();
+
+  // Add pitch type change handler
+  document.getElementById('pitch-type')?.addEventListener('change', handlePitchTypeChange);
+
+  // Add central octave change handler
+  document.getElementById('central-octave')?.addEventListener('input', handleCentralOctaveChange);
+
+  // Initialize color vision mode
+  const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
+  if (colorVisionSelect) {
+    colorVisionSelect.value = settings.colorVisionMode;
+  }
 }, false);
 
 function init(): void {
@@ -738,7 +803,7 @@ function populatePresetDropdown(): void {
     groupPresets.forEach(preset => {
       const option = document.createElement('option');
       option.text = preset.label;
-      option.value = JSON.stringify(preset.parameters); // Store parameters directly
+      option.value = JSON.stringify(preset.parameters);
       optgroup.appendChild(option);
     });
 
@@ -766,6 +831,9 @@ function populatePresetDropdown(): void {
           }
         });
 
+        // Update note configuration
+        updateNoteConfigFromPreset(parameters);
+
         // Update URL without navigation
         changeURL();
         
@@ -783,7 +851,26 @@ function populatePresetDropdown(): void {
   checkPreset(16);
 }
 
-// Modify checkPreset to work with JSON presets
+// Add function to update note configuration from preset or URL parameters
+function updateNoteConfigFromPreset(parameters: QueryDataInterface): void {
+  const namesElement = document.getElementById('names') as HTMLTextAreaElement;
+  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+
+  // Update note names if provided
+  if (parameters.names && Array.isArray(parameters.names)) {
+    namesElement.value = parameters.names.join('\n');
+  }
+
+  // Update note colors if provided
+  if (parameters.note_colors && Array.isArray(parameters.note_colors)) {
+    noteColorsElement.value = parameters.note_colors.join('\n');
+  }
+
+  // Reinitialize note configuration UI
+  initNoteConfig();
+}
+
+// Update checkPreset to also update note configuration
 function checkPreset(init: number): void {
   const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
   if (!mselect) return;
@@ -849,6 +936,12 @@ function checkPreset(init: number): void {
   if (!presetFound) {
     mselect.selectedIndex = 0;
   }
+
+  // After finding a matching preset, update note configuration
+  if (window.location.search) {
+    const params = new QueryData(window.location.search, true);
+    updateNoteConfigFromPreset(params);
+  }
 }
 
 export function drawGrid(): void {
@@ -862,7 +955,7 @@ export function drawGrid(): void {
     for (let ur = -Math.floor(max); ur < max; ur++) {
       const coords = new Point(r, ur);
       const centsObj = hexCoordsToCents(coords);
-      drawHex(coords, centsToColor(centsObj, false));
+      drawHex(coords, centsToColor(centsObj, settings.invert_updown));
     }
   }
 }
@@ -934,4 +1027,233 @@ function loadInstrumentSamples(): void {
     initInstrumentSample("piano", 0);
     setSampleFadeout(0.1);
   }
+}
+
+function initNoteConfig(): void {
+  const noteConfig = document.getElementById('note-config');
+  if (!noteConfig) return;
+
+  // Find or create note-buttons container
+  let noteButtons = noteConfig.querySelector('.note-buttons');
+  if (!noteButtons) {
+    noteButtons = document.createElement('div');
+    noteButtons.className = 'note-buttons';
+    noteConfig.appendChild(noteButtons);
+  } else {
+    // Clear existing buttons
+    noteButtons.innerHTML = '';
+  }
+
+  // Get current note names and colors
+  const names = (document.getElementById('names') as HTMLTextAreaElement)?.value.split('\n') || [];
+  const colors = (document.getElementById('note_colors') as HTMLTextAreaElement)?.value.split('\n') || [];
+
+  // Create preview buttons for each note
+  names.forEach((name, index) => {
+    const button = document.createElement('button');
+    button.className = 'note-button';
+    button.style.backgroundColor = `#${colors[index] || 'ffffff'}`;
+    button.textContent = name;
+    button.disabled = true; // Make buttons non-interactive
+    noteButtons.appendChild(button);
+  });
+
+  // Add live update handlers to textareas
+  const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
+  const colorsTextarea = document.getElementById('note_colors') as HTMLTextAreaElement;
+
+  if (namesTextarea && colorsTextarea) {
+    // Show the textareas
+    namesTextarea.style.display = 'block';
+    colorsTextarea.style.display = 'block';
+
+    // Add scroll synchronization
+    namesTextarea.addEventListener('scroll', () => {
+      colorsTextarea.scrollTop = namesTextarea.scrollTop;
+    });
+
+    colorsTextarea.addEventListener('scroll', () => {
+      namesTextarea.scrollTop = colorsTextarea.scrollTop;
+    });
+
+    // Add input handlers for live updates
+    namesTextarea.addEventListener('input', () => {
+      synchronizeTextareas();
+      updatePreviewButtons();
+      updateKeyboardDisplay();
+      changeURL();
+    });
+
+    colorsTextarea.addEventListener('input', () => {
+      synchronizeTextareas();
+      updatePreviewButtons();
+      updateKeyboardDisplay();
+      changeURL();
+    });
+  }
+}
+
+// Function to keep textareas synchronized in length
+function synchronizeTextareas(): void {
+  const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
+  const colorsTextarea = document.getElementById('note_colors') as HTMLTextAreaElement;
+
+  if (!namesTextarea || !colorsTextarea) return;
+
+  const names = namesTextarea.value.split('\n');
+  const colors = colorsTextarea.value.split('\n');
+
+  // Ensure both arrays have the same length
+  const maxLength = Math.max(names.length, colors.length);
+  while (names.length < maxLength) names.push('');
+  while (colors.length < maxLength) colors.push('ffffff');
+
+  // Update textareas
+  namesTextarea.value = names.join('\n');
+  colorsTextarea.value = colors.join('\n');
+}
+
+// Function to update preview buttons
+function updatePreviewButtons(): void {
+  const noteButtons = document.querySelector('.note-buttons');
+  if (!noteButtons) return;
+
+  const names = (document.getElementById('names') as HTMLTextAreaElement)?.value.split('\n') || [];
+  const colors = (document.getElementById('note_colors') as HTMLTextAreaElement)?.value.split('\n') || [];
+
+  // Clear existing buttons
+  noteButtons.innerHTML = '';
+
+  // Create new preview buttons
+  names.forEach((name, index) => {
+    const button = document.createElement('button');
+    button.className = 'note-button';
+    button.style.backgroundColor = `#${colors[index] || 'ffffff'}`;
+    button.textContent = name;
+    button.disabled = true; // Make buttons non-interactive
+    noteButtons.appendChild(button);
+  });
+}
+
+function handlePitchTypeChange(): void {
+  const pitchType = (document.getElementById('pitch-type') as HTMLSelectElement)?.value;
+  const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
+  const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
+
+  if (!fundamentalInput || !scaleElement) return;
+
+  const currentValue = parseFloat(fundamentalInput.value);
+  const scaleLines = scaleElement.value.split('\n');
+  let scaleSize = 12; // Default to 12 if not found
+
+  // Find scale size from the Scala file
+  for (const line of scaleLines) {
+    if (/^\d+$/.test(line.trim())) {
+      scaleSize = parseInt(line.trim());
+      break;
+    }
+  }
+
+  if (pitchType === 'A4') {
+    // Convert fundamental to A4
+    const stepsToA4 = 69; // MIDI note number for A4
+    const fundamentalMIDI = 60; // MIDI note number for middle C
+    const stepsPerOctave = scaleSize;
+    const ratio = Math.pow(2, (stepsToA4 - fundamentalMIDI) / stepsPerOctave);
+    fundamentalInput.value = (currentValue * ratio).toFixed(6);
+  } else {
+    // Convert A4 to fundamental
+    const stepsToA4 = 69; // MIDI note number for A4
+    const fundamentalMIDI = 60; // MIDI note number for middle C
+    const stepsPerOctave = scaleSize;
+    const ratio = Math.pow(2, (fundamentalMIDI - stepsToA4) / stepsPerOctave);
+    fundamentalInput.value = (currentValue * ratio).toFixed(6);
+  }
+
+  changeURL();
+}
+
+function handleCentralOctaveChange(): void {
+  const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
+  if (!octaveSlider) return;
+
+  const octaveShift = parseInt(octaveSlider.value);
+  // Update the fundamental frequency based on the octave shift
+  const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
+  if (fundamentalInput) {
+    const baseFreq = parseFloat(fundamentalInput.value);
+    const newFreq = baseFreq * Math.pow(2, octaveShift);
+    settings.fundamental = newFreq;
+    drawGrid();
+  }
+}
+
+// Add color vision mode update function
+function updateColorVisionMode(): void {
+  const select = document.getElementById('color-vision-mode') as HTMLSelectElement;
+  settings.colorVisionMode = select.value as ColorVisionType;
+  
+  // Transform colors based on selected mode
+  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+  if (noteColorsElement) {
+    const originalColors = noteColorsElement.value.split('\n').map(c => `#${c}`);
+    const transformedColors = transformColorsForCVD(originalColors, settings.colorVisionMode);
+    settings.keycolors = transformedColors.map(c => c.substring(1));
+  }
+  
+  // Update the keyboard display
+  updateKeyboardDisplay();
+}
+
+// Add color saturation adjustment function
+function adjustColorSaturation(hexColor: string, saturationFactor: number): string {
+  // Convert hex to HSL
+  const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+  const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+  const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else if (max === b) h = (r - g) / d + 4;
+    
+    h /= 6;
+  }
+
+  // Adjust saturation
+  s *= saturationFactor;
+
+  // Convert back to RGB
+  function hue2rgb(p: number, q: number, t: number): number {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  const newR = hue2rgb(p, q, h + 1/3);
+  const newG = hue2rgb(p, q, h);
+  const newB = hue2rgb(p, q, h - 1/3);
+
+  // Convert back to hex
+  const toHex = (n: number) => {
+    const hex = Math.round(n * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+
+  return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`;
 } 
