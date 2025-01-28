@@ -28,7 +28,7 @@ import {
   setSampleFadeout,
   getSampleBuffer,
   getAudioContext
-} from './audioHandler.js';
+} from './audioHandler.ts';
 
 // Import event handling functions
 import {
