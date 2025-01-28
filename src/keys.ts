@@ -35,6 +35,7 @@ import { QueryData } from './QueryData';
 
 // Import color transformation functions
 import { transformColorsForCVD, ColorVisionType } from './colorTransform';
+import { hex2rgb, adjustColorSaturation } from './colorUtils';
 
 // Type definitions
 interface Instrument {
@@ -205,8 +206,26 @@ function updateColorSaturation(): void {
   const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
   if (saturationSlider) {
     settings.colorSaturation = parseInt(saturationSlider.value);
+    updatePreviewButtons();
     updateKeyboardDisplay();
   }
+}
+
+// Add color vision mode update function
+function updateColorVisionMode(): void {
+  const select = document.getElementById('color-vision-mode') as HTMLSelectElement;
+  settings.colorVisionMode = select.value as ColorVisionType;
+  
+  // Transform colors based on selected mode
+  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+  if (noteColorsElement) {
+    const originalColors = noteColorsElement.value.split('\n').map(c => `#${c}`);
+    const transformedColors = transformColorsForCVD(originalColors, settings.colorVisionMode);
+    settings.keycolors = transformedColors.map(c => c.substring(1));
+  }
+  
+  updatePreviewButtons();
+  updateKeyboardDisplay();
 }
 
 // Make functions available globally
@@ -348,6 +367,21 @@ hideRevealNames();
 hideRevealColors();
 hideRevealEnum();
 
+// Add function to apply all color transformations
+function applyColorTransformations(colors: string[]): string[] {
+  // Ensure colors have # prefix
+  const originalColors = colors.map(c => c.startsWith('#') ? c : `#${c}`);
+  
+  // Apply saturation adjustment
+  const saturatedColors = originalColors.map(color => 
+    adjustColorSaturation(color, settings.colorSaturation / 100)
+  );
+  
+  // Apply color vision deficiency transformation
+  return transformColorsForCVD(saturatedColors, settings.colorVisionMode);
+}
+
+// Update keyboard display function
 function updateKeyboardDisplay(): void {
   // Update all the settings
   settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
@@ -357,9 +391,76 @@ function updateKeyboardDisplay(): void {
   settings.names = (document.getElementById('names') as HTMLInputElement).value.split('\n');
   settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
   parseScaleColors();
+
+  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+  if (!noteColorsElement) return;
+
+  const colors = noteColorsElement.value.split('\n');
+  const transformedColors = applyColorTransformations(colors);
   
+  // Update keyboard colors
+  const keys = document.getElementsByClassName('piano-key');
+  Array.from(keys).forEach((key, index) => {
+    const keyElement = key as HTMLElement;
+    const baseColor = transformedColors[index] || '#ffffff';
+    
+    if (settings.invert_updown) {
+      // Convert to RGB to darken
+      const rgb = hex2rgb(baseColor);
+      rgb[0] = Math.max(0, rgb[0] - 90);
+      rgb[1] = Math.max(0, rgb[1] - 90);
+      rgb[2] = Math.max(0, rgb[2] - 90);
+      keyElement.style.backgroundColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+    } else {
+      keyElement.style.backgroundColor = baseColor;
+    }
+  });
+
   // Redraw the grid
   drawGrid();
+}
+
+// Update preview buttons function
+function updatePreviewButtons(): void {
+  const noteNamesElement = document.getElementById('note_names') as HTMLTextAreaElement;
+  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+  const noteButtons = document.getElementById('note-buttons');
+  
+  if (!noteNamesElement || !noteColorsElement || !noteButtons) return;
+  
+  const names = noteNamesElement.value.split('\n');
+  const colors = noteColorsElement.value.split('\n');
+  
+  // Clear existing buttons
+  noteButtons.innerHTML = '';
+  
+  // Apply all color transformations
+  const transformedColors = applyColorTransformations(colors);
+  
+  // Create new preview buttons
+  names.forEach((name, index) => {
+    const button = document.createElement('button');
+    button.className = 'note-button';
+    
+    // Apply the transformed color
+    const baseColor = transformedColors[index] || '#ffffff';
+    
+    // Apply invert up/down if needed
+    if (settings.invert_updown) {
+      // Convert to RGB to darken
+      const rgb = hex2rgb(baseColor);
+      rgb[0] = Math.max(0, rgb[0] - 90);
+      rgb[1] = Math.max(0, rgb[1] - 90);
+      rgb[2] = Math.max(0, rgb[2] - 90);
+      button.style.backgroundColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+    } else {
+      button.style.backgroundColor = baseColor;
+    }
+    
+    button.textContent = name;
+    button.disabled = true; // Make buttons non-interactive
+    noteButtons.appendChild(button);
+  });
 }
 
 function hideRevealNames(): void {
@@ -736,10 +837,17 @@ window.addEventListener('load', () => {
   // Add central octave change handler
   document.getElementById('central-octave')?.addEventListener('input', handleCentralOctaveChange);
 
-  // Initialize color vision mode
+  // Initialize color vision mode and add listeners
   const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
   if (colorVisionSelect) {
     colorVisionSelect.value = settings.colorVisionMode;
+    colorVisionSelect.addEventListener('change', updateColorVisionMode);
+  }
+
+  // Add color saturation slider listener
+  const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
+  if (saturationSlider) {
+    saturationSlider.addEventListener('input', updateColorSaturation);
   }
 }, false);
 
@@ -1113,28 +1221,6 @@ function synchronizeTextareas(): void {
   colorsTextarea.value = colors.join('\n');
 }
 
-// Function to update preview buttons
-function updatePreviewButtons(): void {
-  const noteButtons = document.querySelector('.note-buttons');
-  if (!noteButtons) return;
-
-  const names = (document.getElementById('names') as HTMLTextAreaElement)?.value.split('\n') || [];
-  const colors = (document.getElementById('note_colors') as HTMLTextAreaElement)?.value.split('\n') || [];
-
-  // Clear existing buttons
-  noteButtons.innerHTML = '';
-
-  // Create new preview buttons
-  names.forEach((name, index) => {
-    const button = document.createElement('button');
-    button.className = 'note-button';
-    button.style.backgroundColor = `#${colors[index] || 'ffffff'}`;
-    button.textContent = name;
-    button.disabled = true; // Make buttons non-interactive
-    noteButtons.appendChild(button);
-  });
-}
-
 function handlePitchTypeChange(): void {
   const pitchType = (document.getElementById('pitch-type') as HTMLSelectElement)?.value;
   const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
@@ -1186,23 +1272,6 @@ function handleCentralOctaveChange(): void {
     settings.fundamental = newFreq;
     drawGrid();
   }
-}
-
-// Add color vision mode update function
-function updateColorVisionMode(): void {
-  const select = document.getElementById('color-vision-mode') as HTMLSelectElement;
-  settings.colorVisionMode = select.value as ColorVisionType;
-  
-  // Transform colors based on selected mode
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  if (noteColorsElement) {
-    const originalColors = noteColorsElement.value.split('\n').map(c => `#${c}`);
-    const transformedColors = transformColorsForCVD(originalColors, settings.colorVisionMode);
-    settings.keycolors = transformedColors.map(c => c.substring(1));
-  }
-  
-  // Update the keyboard display
-  updateKeyboardDisplay();
 }
 
 // Add color saturation adjustment function

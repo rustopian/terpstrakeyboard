@@ -184,4 +184,25 @@ export function rgbToHex(r: number, g: number, b: number): HexColor {
 
 export function rgb(r: number, g: number, b: number): string {
   return `rgb(${r},${g},${b})`;
+}
+
+// Add color saturation adjustment function
+export function adjustColorSaturation(hexColor: string, saturationFactor: number): string {
+  // Remove # if present
+  const hex = hexColor.charAt(0) === '#' ? hexColor.substring(1) : hexColor;
+  
+  // Convert hex to RGB
+  const rgb = hex2rgb(`#${hex}`);
+  
+  // Convert RGB to HSV
+  const hsv = rgb2hsv(rgb[0], rgb[1], rgb[2]);
+  
+  // Adjust saturation
+  hsv.s = Math.min(100, Math.max(0, hsv.s * saturationFactor));
+  
+  // Convert back to RGB
+  const rgbResult = HSVtoRGB2(hsv.h / 360, hsv.s / 100, hsv.v / 100);
+  
+  // Convert RGB to hex
+  return rgbToHex(rgbResult.red, rgbResult.green, rgbResult.blue);
 } 
