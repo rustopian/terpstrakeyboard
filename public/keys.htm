@@ -21,6 +21,7 @@
 
 <body style="overflow: scroll;">
 	<div class="modal-overlay"></div>
+	<div class="scroll-area"></div>
 	
 	<div id="landing-page" class="section modal">
 		<div class="container">
@@ -50,7 +51,7 @@
 								<label>Reference Pitch</label>
 								<div class="pitch-controls">
 									<select id="pitch-type" class="u-half-width">
-										<option value="fundamental">Fundamental (Hz)</option>
+										<option value="fundamental">C4 (Hz)</option>
 										<option value="A4">A4 (Hz)</option>
 									</select>
 									<input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="changeURL();noPreset();" class="u-half-width">
@@ -102,7 +103,7 @@
 
 							<label>
 								<input id="midi_input" type="checkbox" name="midi_input" value="fnord" onchange="changeURL();noPreset();">
-								<span class="label-body">Enable MIDI Input</span>
+								<span class="label-body">Control MIDI devices (WebMIDI Output)</span>
 							</label>
 						</div>
 					</div>
@@ -245,6 +246,14 @@ ff5555
 				<div id="advanced" class="tab-content">
 					<div class="row">
 						<div class="column">
+							<label>
+								<input id="show_intervals" type="checkbox" name="show_intervals" value="fnord" onchange="changeURL();noPreset();">
+								<span class="label-body">Show Intervals</span>
+							</label>
+							<label>
+								<input id="show_all_notes" type="checkbox" name="show_all_notes" value="fnord" onchange="changeURL();noPreset();">
+								<span class="label-body">Show All Played Notes</span>
+							</label>
 							<label>Scale (<a href="http://www.huygens-fokker.org/scala/scl_format.html" target="new" style="color: #222; text-decoration: none;">Scala format</a>)</label>
 							<textarea id="scale" onchange="changeURL();noPreset();" class="iosscrollable u-full-width" rows="12">! 31-ed2 Bosanquet Wilson Terpstra.scl
 ! 31-tone equal tempered scale consisting of 31 sonically equal divisions per frequency halving/doubling in standard meantone notation, mapped on a Bosanquet / Wilson / Terpstra layout.
@@ -291,7 +300,7 @@ Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
 				<div id="credits" class="tab-content">
 					<div class="row">
 						<div class="container" style="text-align:center">
-							Designed by <a href="http://siementerpstra.com/" target="new">Siemen Terpstra</a> in the late '80's. WebApp developed by <a href="http://jamesfenn.com/" target="new">James Fenn</a> with additions and modifications by <a href="http://brandlew.com/" target="new">Brandon Lewis</a>, <a href="http://whatmusicreallyis.com/" title="What Music Really İs" target="new">Bo Constantinsen</a> and <a href="https://sites.google.com/site/wangchengu/" target="new">Chengu Wang</a>. Credits to Scott Thompson and <a href="http://ozanyarman.com/" target="new">Dr Ozan Yarman</a> for contributing samples. Current version 1.4 (Jan. 2015 — Mar. 2018), released as Free/Libre and Open Source Software under <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" target="new">GPL-3.0</a>. Download, fork, and get your name down here by fixing issues and implementing features via <a href="https://github.com/wcgbg/terpstrakeyboard/" target="new">GitHub</a>!
+							Hex layout by <a href="http://siementerpstra.com/" target="new">Siemen Terpstra</a> in the late 80s. Early web development by <a href="http://jamesfenn.com/" target="new">James Fenn</a> and <a href="http://brandlew.com/" target="new">Brandon Lewis</a>, <a href="http://whatmusicreallyis.com/" title="What Music Really İs" target="new">Bo Constantinsen</a> and <a href="https://sites.google.com/site/wangchengu/" target="new">Chengu Wang</a>. Current 2024-2025 version created and maintained by Peter Keay @rustopian. Credits to Scott Thompson and <a href="http://ozanyarman.com/" target="new">Dr Ozan Yarman</a> for contributing samples. Current version 2.0 (Jan. 2025), released as Free/Libre and Open Source Software under <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" target="new">GPL-3.0</a>.
 						</div>
 					</div>
 				</div>

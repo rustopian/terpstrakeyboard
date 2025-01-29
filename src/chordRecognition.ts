@@ -24,6 +24,17 @@ export function updateChordDisplay(notes: number[]): void {
     return settings.names[reducedNote];
   });
 
+  // Show intervals for 2 notes if the setting is enabled
+  if (notes.length === 2 && settings.showIntervals) {
+    const interval = Math.abs((notes[1] - notes[0] + 53) % 53);
+    const intervalData = SETTINGS_53_EDO.INTERVAL_DICT[interval];
+    if (intervalData && intervalData.length > 0) {
+      display.textContent = `${noteNames.join(' ')} (${intervalData[0].intervalName})`;
+      display.style.display = 'block';
+      return;
+    }
+  }
+
   // Try to recognize chord if we have multiple notes
   if (notes.length >= 2) {
     const chordResult = recognizeChord(notes.map(n => n - 7));
@@ -36,13 +47,18 @@ export function updateChordDisplay(notes: number[]): void {
         displayText += ` + ${chordResult.additionalIntervals.join(' + ')}`;
       }
       display.textContent = displayText;
-    } else {
+      display.style.display = 'block';
+    } else if (settings.showAllNotes) {
+      // Only show note names if showAllNotes is enabled and no chord was recognized
       display.textContent = noteNames.join(' ');
+      display.style.display = 'block';
+    } else {
+      display.style.display = 'none';
     }
   } else {
-    display.textContent = noteNames[0];
+    // Single note - hide display
+    display.style.display = 'none';
   }
-  display.style.display = 'block';
 }
 
 interface ChordResult {
@@ -119,12 +135,30 @@ function getIntervalName(interval: number): string | null {
 function recognizeChord(notes: number[]): ChordResult | null {
   if (notes.length < 2) return null;
 
-  const bassNote = notes[0] % 53;  // The actual bass note from original notes array
-  // Sort and reduce notes to within one octave, removing duplicates
-  const uniqueNotes = [...new Set(notes.map(n => n % 53))];
-  const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
+  // Sort by actual pitch and get the lowest 3-4 notes
+  const sortedNotes = [...notes].sort((a, b) => a - b);
+  const baseNotes = sortedNotes.slice(0, Math.min(4, notes.length));
+  
+  // Try with base notes first
+  let result = findChordInNotes(baseNotes);
+  
+  // If no result with base notes and we have more notes, try with all notes
+  if (!result && baseNotes.length < notes.length) {
+    result = findChordInNotes(notes);
+  }
+  
+  return result;
+}
 
+function findChordInNotes(notes: number[]): ChordResult | null {
+  if (notes.length < 2) return null;
+
+  const bassNote = notes[0] % 53;
+  const uniqueNotes = [...new Set(notes.map(n => ((n % 53) + 53) % 53))];
+  const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
+  
   let bestResult: ChordResult | null = null;
+  let bestScore = -Infinity;
 
   // Try each note as potential root
   for (let i = 0; i < sortedNotes.length; i++) {
@@ -133,66 +167,73 @@ function recognizeChord(notes: number[]): ChordResult | null {
     // Calculate intervals from this potential root
     const intervals = [];
     for (let j = 0; j < sortedNotes.length; j++) {
-      if (j !== i) {  // Skip the root note itself
-        let interval = sortedNotes[j] - potentialRoot;
-        if (interval < 0) interval += 53;
+      if (j !== i) {
+        let interval = ((sortedNotes[j] - potentialRoot + 53) % 53);
         intervals.push(interval);
       }
     }
 
-    // Get root note name
-    let reducedRoot = potentialRoot % 53;
-    if (reducedRoot < 0) reducedRoot += 53;
+    const reducedRoot = ((potentialRoot + 53) % 53);
     const rootName = (window as any).settings.names[reducedRoot];
 
-    // Convert each chord spelling to its interval pattern and compare
+    // Try each chord quality
     for (const [quality, spelling] of Object.entries(SETTINGS_53_EDO.CHORD_SPELLINGS)) {
       const pattern = getChordPattern(spelling);
       
-      // Sort both interval arrays for comparison
       const sortedPattern = [...pattern].sort((a, b) => a - b);
       const sortedIntervals = [...intervals].sort((a, b) => a - b);
       
-      // First try to find a basic triad match
       const triadMatch = sortedPattern.every(patternInterval => 
         sortedIntervals.includes(patternInterval));
 
       if (triadMatch) {
-        // Calculate all chord tones relative to root
+        // Calculate chord tones
         const chordTones = [reducedRoot];
         for (const interval of pattern) {
           let tone = (reducedRoot + interval) % 53;
           chordTones.push(tone);
         }
 
-        // Determine inversion by finding which chord tone is in the bass
+        // Determine inversion
         let inversion = 0;
         const bassPosition = chordTones.indexOf(bassNote);
         if (bassPosition > 0) {
           inversion = bassPosition;
         }
 
-        const result = {
-          root: rootName,
-          quality,
-          inversion,
-          additionalIntervals: [] as string[]
-        };
-
-        // Look for additional intervals above this specific chord
+        // Find additional intervals
         const chordIntervals = new Set(sortedPattern);
         const additionalIntervals = sortedIntervals
           .filter(interval => !chordIntervals.has(interval))
           .map(interval => getIntervalName(interval))
           .filter((name): name is string => name !== null);
 
-        if (additionalIntervals.length > 0) {
-          result.additionalIntervals = additionalIntervals;
-        }
+        const result = {
+          root: rootName,
+          quality,
+          inversion,
+          additionalIntervals: additionalIntervals
+        };
 
-        // Update best result if this is our first match or if this root makes more sense
-        if (!bestResult || (additionalIntervals.length < (bestResult.additionalIntervals?.length || 0))) {
+        // Score based on actual MIDI note distances
+        let score = 0;
+        
+        // Find the root note in the original notes array
+        const rootNote = notes.find(n => n % 53 === reducedRoot);
+        if (rootNote !== undefined) {
+          // Prefer roots that are closer to the bass note in actual MIDI distance
+          score -= Math.abs(rootNote - notes[0]);
+        } else {
+          // Heavy penalty if root isn't in the original notes
+          score -= 100;
+        }
+        
+        // Penalty for additional intervals
+        score -= additionalIntervals.length * 10;
+
+        if (score > bestScore) {
           bestResult = result;
+          bestScore = score;
         }
       }
     }

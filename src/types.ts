@@ -40,4 +40,6 @@ export interface Settings {
   activeSources: { [key: number]: { source: AudioBufferSourceNode; gainNode: GainNode } };
   fadeoutTime: number;
   sampleBuffer: (AudioBuffer | undefined)[];
+  showIntervals: boolean;
+  showAllNotes: boolean;
 } 

@@ -33,7 +33,7 @@ import {
 import { QueryData } from './QueryData';
 
 // Import color transformation functions
-import { transformColorsForCVD, ColorVisionType } from './colorTransform';
+import { transformColorsForCVD, transformColorForCVD, ColorVisionType } from './colorTransform';
 import { hex2rgb, adjustColorSaturation } from './colorUtils';
 
 // Type definitions
@@ -98,6 +98,8 @@ interface Settings {
   colorVisionMode: ColorVisionType;
   colorSaturation: number;
   invert_updown: boolean;
+  showIntervals: boolean;
+  showAllNotes: boolean;
 }
 
 // Add WebMidi types
@@ -200,6 +202,8 @@ let settings: Settings = {
   colorVisionMode: 'normal',
   colorSaturation: 100,
   invert_updown: false,
+  showIntervals: false,
+  showAllNotes: false,
 };
 
 // Add color saturation update function
@@ -369,6 +373,58 @@ hideRevealNames();
 hideRevealColors();
 hideRevealEnum();
 
+// Update preview buttons function
+function updatePreviewButtons(): void {
+  const namesElement = document.getElementById('names') as HTMLTextAreaElement;
+  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
+  const noteButtons = document.querySelector('.note-buttons');
+  
+  if (!namesElement || !noteColorsElement || !noteButtons) return;
+  
+  const names = namesElement.value.split('\n');
+  const colors = noteColorsElement.value.split('\n');
+  
+  // Clear existing buttons
+  noteButtons.innerHTML = '';
+  
+  // Apply all color transformations
+  const transformedColors = colors.map(c => {
+    // Ensure color has # prefix
+    const hexColor = c.startsWith('#') ? c : `#${c}`;
+    
+    // Apply saturation adjustment first
+    const saturatedColor = adjustColorSaturation(hexColor, settings.colorSaturation / 100);
+    
+    // Then apply color vision deficiency transformation
+    return transformColorForCVD(saturatedColor, settings.colorVisionMode);
+  });
+  
+  // Create new preview buttons
+  names.forEach((name, index) => {
+    const button = document.createElement('button');
+    button.className = 'note-button';
+    
+    // Apply the transformed color
+    const baseColor = transformedColors[index] || '#ffffff';
+    
+    // Apply invert up/down if needed
+    if (settings.invert_updown) {
+      // Convert to RGB to darken
+      const rgb = hex2rgb(baseColor);
+      const darkenedColor = `rgb(${Math.max(0, rgb[0] - 90)}, ${Math.max(0, rgb[1] - 90)}, ${Math.max(0, rgb[2] - 90)})`;
+      button.style.backgroundColor = darkenedColor;
+      button.style.color = '#ffffff';
+    } else {
+      button.style.backgroundColor = baseColor;
+      button.style.color = '#000000';
+    }
+    
+    button.textContent = name;
+    button.disabled = true; // Make buttons non-interactive
+    noteButtons.appendChild(button);
+  });
+}
+
 // Add function to apply all color transformations
 function applyColorTransformations(colors: string[]): string[] {
   // Ensure colors have # prefix
@@ -392,6 +448,8 @@ export function updateKeyboardDisplay(): void {
   settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
   settings.names = (document.getElementById('names') as HTMLTextAreaElement).value.split('\n');
   settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
+  settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
+  settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
   
   // Update text color based on invert setting
   current_text_color = settings.invert_updown ? "#ffffff" : "#000000";
@@ -404,49 +462,6 @@ export function updateKeyboardDisplay(): void {
     settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
     drawGrid();
   }
-}
-
-// Update preview buttons function
-function updatePreviewButtons(): void {
-  const noteNamesElement = document.getElementById('note_names') as HTMLTextAreaElement;
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  const noteButtons = document.getElementById('note-buttons');
-  
-  if (!noteNamesElement || !noteColorsElement || !noteButtons) return;
-  
-  const names = noteNamesElement.value.split('\n');
-  const colors = noteColorsElement.value.split('\n');
-  
-  // Clear existing buttons
-  noteButtons.innerHTML = '';
-  
-  // Apply all color transformations
-  const transformedColors = applyColorTransformations(colors.map(c => `#${c}`));
-  
-  // Create new preview buttons
-  names.forEach((name, index) => {
-    const button = document.createElement('button');
-    button.className = 'note-button';
-    
-    // Apply the transformed color
-    const baseColor = transformedColors[index] || '#ffffff';
-    
-    // Apply invert up/down if needed
-    if (settings.invert_updown) {
-      // Convert to RGB to darken
-      const rgb = hex2rgb(baseColor);
-      rgb[0] = Math.max(0, rgb[0] - 90);
-      rgb[1] = Math.max(0, rgb[1] - 90);
-      rgb[2] = Math.max(0, rgb[2] - 90);
-      button.style.backgroundColor = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-    } else {
-      button.style.backgroundColor = baseColor;
-    }
-    
-    button.textContent = name;
-    button.disabled = true; // Make buttons non-interactive
-    noteButtons.appendChild(button);
-  });
 }
 
 function hideRevealNames(): void {
@@ -535,7 +550,8 @@ function changeURL(): void {
   const params = [
     "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
     "instrument", "enum", "equivSteps", "spectrum_colors",
-    "fundamental_color", "no_labels", "midi_input", "invert-updown"
+    "fundamental_color", "no_labels", "midi_input", "invert-updown",
+    "show_intervals", "show_all_notes"
   ];
 
   url += params.map(param => `${param}=${getElementValue(param)}`).join('&');
@@ -605,25 +621,26 @@ function parseScaleColors(): void {
 
 function resizeHandler(): void {
   const newWidth = window.innerWidth;
-  const newHeight = window.innerHeight;
+  const newHeight = window.innerHeight - 50;  // Account for scroll area
 
   if (!settings.canvas || !settings.context) return;
 
-  settings.canvas.style.height = newHeight + 'px';
-  settings.canvas.style.width = newWidth + 'px';
-
-  settings.canvas.style.marginTop = (-newHeight / 2) + 'px';
-  settings.canvas.style.marginLeft = (-newWidth / 2) + 'px';
-
+  // Set canvas dimensions
   settings.canvas.width = newWidth;
   settings.canvas.height = newHeight;
+  settings.canvas.style.width = '100%';
+  settings.canvas.style.height = '100%';
+  settings.canvas.style.margin = '0';
 
-  // Find new centerpoint
-  const centerX = newWidth / 2;
-  const centerY = newHeight / 2;
-  settings.centerpoint = new Point(centerX, centerY);
+  // Calculate centerpoint
+  settings.centerpoint = new Point(newWidth / 2, newHeight / 2);
 
-  // Rotate about it
+  // Calculate hex dimensions based on user's hex size setting
+  settings.hexHeight = settings.hexSize * 2;
+  settings.hexVert = settings.hexHeight * 3 / 4;
+  settings.hexWidth = Math.sqrt(3) / 2 * settings.hexHeight;
+
+  // Rotate about centerpoint
   if (settings.rotationMatrix) {
     settings.context.restore();
   }
@@ -634,7 +651,8 @@ function resizeHandler(): void {
   const m = calculateRotationMatrix(settings.rotation, settings.centerpoint);
   settings.context.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
 
-  // Redraw Grid
+  // Clear and redraw
+  settings.context.clearRect(0, 0, newWidth, newHeight);
   drawGrid();
 }
 
@@ -673,8 +691,16 @@ function goKeyboard(): boolean {
 
   // Hide settings and show keyboard
   hideSettings();
-  const keyboard = document.getElementById("keyboard");
-  if (keyboard) keyboard.style.display = "block";
+  const keyboard = document.getElementById("keyboard") as HTMLCanvasElement;
+  if (keyboard) {
+    keyboard.style.display = "block";
+    // Set initial canvas size
+    keyboard.width = window.innerWidth;
+    keyboard.height = window.innerHeight - 50;
+    keyboard.style.width = '100%';
+    keyboard.style.height = '100%';
+    keyboard.style.margin = '0';
+  }
 
   // Reset all pressed states
   settings.pressedKeys = [];
@@ -727,6 +753,7 @@ function goKeyboard(): boolean {
   settings.names = (document.getElementById('names') as HTMLInputElement).value.split('\n');
   settings.enum = (document.getElementById('enum') as HTMLInputElement).checked;
   settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
+  settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
 
   settings.canvas = document.getElementById('keyboard') as HTMLCanvasElement;
   settings.context = settings.canvas.getContext('2d')!;
@@ -738,6 +765,8 @@ function goKeyboard(): boolean {
   settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
   settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement).checked;
   settings.fundamental_color = (document.getElementById('fundamental_color') as HTMLInputElement).value;
+  settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
+  settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
 
   // Initialize display utils
   initDisplayUtils(settings);
@@ -758,6 +787,9 @@ function goKeyboard(): boolean {
 
 window.addEventListener('load', () => {
   loadPresets();
+  
+  // Initialize scroll area
+  initScrollArea();
   
   // Initialize audio context immediately
   const ctx = initAudio();
@@ -823,7 +855,11 @@ window.addEventListener('load', () => {
   initNoteConfig();
 
   // Add pitch type change handler
-  document.getElementById('pitch-type')?.addEventListener('change', handlePitchTypeChange);
+  document.getElementById('pitch-type')?.addEventListener('change', () => {
+    handlePitchTypeChange();
+    // Update central octave after pitch type change
+    handleCentralOctaveChange();
+  });
 
   // Add central octave change handler
   document.getElementById('central-octave')?.addEventListener('input', handleCentralOctaveChange);
@@ -832,13 +868,29 @@ window.addEventListener('load', () => {
   const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
   if (colorVisionSelect) {
     colorVisionSelect.value = settings.colorVisionMode;
-    colorVisionSelect.addEventListener('change', updateColorVisionMode);
+    colorVisionSelect.addEventListener('change', () => {
+      updateColorVisionMode();
+      updatePreviewButtons();
+    });
   }
 
   // Add color saturation slider listener
   const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
   if (saturationSlider) {
-    saturationSlider.addEventListener('input', updateColorSaturation);
+    saturationSlider.addEventListener('input', () => {
+      updateColorSaturation();
+      updatePreviewButtons();
+    });
+  }
+
+  // Add invert up/down checkbox listener
+  const invertUpdownCheckbox = document.getElementById('invert-updown') as HTMLInputElement;
+  if (invertUpdownCheckbox) {
+    invertUpdownCheckbox.addEventListener('change', () => {
+      settings.invert_updown = invertUpdownCheckbox.checked;
+      updatePreviewButtons();
+      updateKeyboardDisplay();
+    });
   }
 }, false);
 
@@ -1018,12 +1070,31 @@ function checkPreset(_init: number): void {
 export function drawGrid(): void {
   if (!settings.centerpoint || !settings.hexSize) return;
 
-  const max = (settings.centerpoint.x > settings.centerpoint.y) ?
-    settings.centerpoint.x / settings.hexSize :
-    settings.centerpoint.y / settings.hexSize;
+  // Calculate visible area bounds with generous padding
+  const padding = 20; // More hexes beyond visible area
+  const width = window.innerWidth;
+  const height = window.innerHeight - 50;
   
-  for (let r = -Math.floor(max); r < max; r++) {
-    for (let ur = -Math.floor(max); ur < max; ur++) {
+  // Calculate how many hexes fit in view (plus padding)
+  const hexesAcrossHalf = Math.ceil((width / settings.hexWidth)) + padding;
+  const hexesVerticalHalf = Math.ceil((height / settings.hexVert)) + padding;
+  
+  // Calculate grid bounds relative to centerpoint
+  const viewCenterX = settings.centerpoint.x;
+  const viewCenterY = settings.centerpoint.y;
+  
+  // Calculate hex coordinates range with offset based on view center
+  const centerOffsetX = Math.floor(viewCenterX / settings.hexWidth);
+  const centerOffsetY = Math.floor(viewCenterY / settings.hexVert);
+  
+  const minR = -hexesAcrossHalf + centerOffsetX;
+  const maxR = hexesAcrossHalf + centerOffsetX;
+  const minUR = -hexesVerticalHalf + centerOffsetY;
+  const maxUR = hexesVerticalHalf + centerOffsetY;
+  
+  // Draw the grid
+  for (let r = minR; r <= maxR; r++) {
+    for (let ur = minUR; ur <= maxUR; ur++) {
       const coords = new Point(r, ur);
       const centsObj = hexCoordsToCents(coords);
       drawHex(coords, centsToColor(centsObj, false));
@@ -1187,52 +1258,141 @@ function synchronizeTextareas(): void {
 function handlePitchTypeChange(): void {
   const pitchType = (document.getElementById('pitch-type') as HTMLSelectElement)?.value;
   const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
-  const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
 
-  if (!fundamentalInput || !scaleElement) return;
+  if (!fundamentalInput) return;
 
   const currentValue = parseFloat(fundamentalInput.value);
-  const scaleLines = scaleElement.value.split('\n');
-  let scaleSize = 12; // Default to 12 if not found
-
-  // Find scale size from the Scala file
-  for (const line of scaleLines) {
-    if (/^\d+$/.test(line.trim())) {
-      scaleSize = parseInt(line.trim());
-      break;
-    }
-  }
-
+  
   if (pitchType === 'A4') {
-    // Convert fundamental to A4
-    const stepsToA4 = 69; // MIDI note number for A4
-    const fundamentalMIDI = 60; // MIDI note number for middle C
-    const stepsPerOctave = scaleSize;
-    const ratio = Math.pow(2, (stepsToA4 - fundamentalMIDI) / stepsPerOctave);
-    fundamentalInput.value = (currentValue * ratio).toFixed(6);
+    // Convert from C4 to A4 (A4 is 9 semitones above C4)
+    fundamentalInput.value = (currentValue * Math.pow(2, 9/12)).toFixed(5);
   } else {
-    // Convert A4 to fundamental
-    const stepsToA4 = 69; // MIDI note number for A4
-    const fundamentalMIDI = 60; // MIDI note number for middle C
-    const stepsPerOctave = scaleSize;
-    const ratio = Math.pow(2, (fundamentalMIDI - stepsToA4) / stepsPerOctave);
-    fundamentalInput.value = (currentValue * ratio).toFixed(6);
+    // Convert from A4 to C4 (C4 is 9 semitones below A4)
+    fundamentalInput.value = (currentValue * Math.pow(2, -9/12)).toFixed(5);
   }
 
+  // Update settings and redraw
+  settings.fundamental = parseFloat(fundamentalInput.value);
+  drawGrid();
   changeURL();
 }
 
 function handleCentralOctaveChange(): void {
   const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
-  if (!octaveSlider) return;
+  const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
+  
+  if (!octaveSlider || !fundamentalInput) return;
 
   const octaveShift = parseInt(octaveSlider.value);
-  // Update the fundamental frequency based on the octave shift
-  const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
-  if (fundamentalInput) {
-    const baseFreq = parseFloat(fundamentalInput.value);
-    const newFreq = baseFreq * Math.pow(2, octaveShift);
-    settings.fundamental = newFreq;
-    drawGrid();
+  const baseFreq = parseFloat(fundamentalInput.value);
+  
+  // Store the shifted frequency in settings
+  settings.fundamental = baseFreq * Math.pow(2, octaveShift);
+  
+  // Update the display but keep the input showing the base frequency
+  drawGrid();
+}
+
+// Add scroll area functionality with edge detection
+function initScrollArea(): void {
+  const scrollArea = document.querySelector('.scroll-area') as HTMLElement;
+  console.log('Initializing scroll area:', scrollArea);
+  if (!scrollArea) return;
+
+  let isDragging = false;
+  let startX = 0;
+  let lastX = 0;
+  let viewOffset = 0;
+  let isRedrawing = false;
+
+  scrollArea.addEventListener('mousedown', (e: Event) => {
+    console.log('Scroll area mousedown');
+    const mouseEvent = e as MouseEvent;
+    isDragging = true;
+    startX = mouseEvent.pageX;
+    lastX = startX;
+    mouseEvent.preventDefault();
+  });
+
+  scrollArea.addEventListener('touchstart', (e: Event) => {
+    console.log('Scroll area touchstart');
+    const touchEvent = e as TouchEvent;
+    isDragging = true;
+    startX = touchEvent.touches[0].pageX;
+    lastX = startX;
+    touchEvent.preventDefault();
+  });
+
+  function updateView(delta: number): void {
+    if (isRedrawing) return;
+    
+    if (settings.centerpoint) {
+      // Transform the screen-space horizontal movement to grid-space
+      const angle = settings.rotation;
+      const gridDeltaX = delta * Math.cos(angle);
+      const gridDeltaY = -delta * Math.sin(angle);  // Negative to counter the rotation
+      
+      // Update both coordinates to maintain horizontal screen movement
+      settings.centerpoint.x += gridDeltaX;
+      settings.centerpoint.y += gridDeltaY;
+      
+      // Trigger redraw
+      isRedrawing = true;
+      requestAnimationFrame(() => {
+        drawGrid();
+        isRedrawing = false;
+      });
+    }
   }
+
+  document.addEventListener('mousemove', (e: Event) => {
+    if (!isDragging) return;
+    const mouseEvent = e as MouseEvent;
+    const currentX = mouseEvent.pageX;
+    const delta = currentX - lastX;
+    lastX = currentX;
+    
+    updateView(delta);
+    mouseEvent.preventDefault();
+  });
+
+  document.addEventListener('touchmove', (e: Event) => {
+    if (!isDragging) return;
+    const touchEvent = e as TouchEvent;
+    const currentX = touchEvent.touches[0].pageX;
+    const delta = currentX - lastX;
+    lastX = currentX;
+    
+    updateView(delta);
+    touchEvent.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+
+  document.addEventListener('touchend', () => {
+    isDragging = false;
+  });
+
+  document.addEventListener('mouseleave', () => {
+    isDragging = false;
+  });
+
+  // Prevent browser back/forward gestures
+  window.addEventListener('wheel', (e: WheelEvent) => {
+    if (e.deltaX !== 0) {
+      e.preventDefault();
+      updateView(-e.deltaX);
+    }
+  }, { passive: false });
+
+  // Prevent two-finger swipe gestures
+  window.addEventListener('gesturestart', (e: Event) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('gesturechange', (e: Event) => {
+    e.preventDefault();
+  }, { passive: false });
 }
