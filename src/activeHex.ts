@@ -1,5 +1,6 @@
 import { playNote, stopNote, getMidiFromCoords } from './audioHandler.ts';
 import { Point } from './geometry.ts';
+import { updateChordDisplay } from './chordRecognition';
 
 declare global {
   interface WebMidiOutput {
@@ -104,22 +105,24 @@ export class ActiveHex {
 
 export function addActiveNote(hex: ActiveHex): void {
   activeNotes.push(hex);
-  console.log('Note added, current active notes:', activeNotes.length, 
-    'MIDI values:', activeNotes.map(hex => 
-      settings ? getMidiFromCoords(hex.coords, settings.rSteps, settings.urSteps) : null
-    )
+  if (!settings) return;
+  
+  const midiNotes = activeNotes.map(hex => 
+    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps)
   );
+  updateChordDisplay(midiNotes);
 }
 
 export function removeActiveNote(hex: ActiveHex): void {
   activeNotes = activeNotes.filter(note => 
     note.coords.x !== hex.coords.x || note.coords.y !== hex.coords.y
   );
-  console.log('Note removed, current active notes:', activeNotes.length,
-    'MIDI values:', activeNotes.map(hex => 
-      settings ? getMidiFromCoords(hex.coords, settings.rSteps, settings.urSteps) : null
-    )
+  if (!settings) return;
+  
+  const midiNotes = activeNotes.map(hex => 
+    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps)
   );
+  updateChordDisplay(midiNotes);
 }
 
 export function clearAllNotes(): void {
@@ -127,6 +130,7 @@ export function clearAllNotes(): void {
   if (settings?.sustainedNotes) {
     settings.sustainedNotes = [];
   }
+  updateChordDisplay([]);
 }
 
 export function getActiveNotes(): number[] {
