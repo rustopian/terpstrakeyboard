@@ -14,6 +14,7 @@ interface Settings {
   equivInterval: number;
   rotationMatrix: [number, number, number, number, number, number];
   hexSize: number;
+  octaveOffset: number;
 }
 
 interface CentsResult {
@@ -54,7 +55,7 @@ export function hexCoordsToCents(coords: Point): CentsResult {
     reducedSteps += settings.scale.length;
     octs -= 1;
   }
-  const cents = octs * settings.equivInterval + settings.scale[reducedSteps];
+  const cents = (octs + (settings.octaveOffset || 0)) * settings.equivInterval + settings.scale[reducedSteps];
   return { cents, reducedSteps };
 }
 

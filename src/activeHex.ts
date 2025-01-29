@@ -19,6 +19,7 @@ interface Settings {
   rSteps: number;
   urSteps: number;
   fundamental: number;
+  octaveOffset: number;
 }
 
 interface AudioResult {
@@ -57,7 +58,7 @@ export class ActiveHex {
     }
 
     if (myOutput) {
-      myOutput.playNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps), [channel]);
+      myOutput.playNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps, settings.octaveOffset), [channel]);
       return;
     }
 
@@ -95,7 +96,7 @@ export class ActiveHex {
       settings.sustainedNotes.push(this);
     } else {
       if (myOutput) {
-        myOutput.stopNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps), [channel]);
+        myOutput.stopNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps, settings.octaveOffset), [channel]);
         return;
       }
       stopNote(this.gainNode, this.source);
@@ -108,7 +109,7 @@ export function addActiveNote(hex: ActiveHex): void {
   if (!settings) return;
   
   const midiNotes = activeNotes.map(hex => 
-    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps)
+    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset)
   );
   updateChordDisplay(midiNotes);
 }
@@ -120,7 +121,7 @@ export function removeActiveNote(hex: ActiveHex): void {
   if (!settings) return;
   
   const midiNotes = activeNotes.map(hex => 
-    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps)
+    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset)
   );
   updateChordDisplay(midiNotes);
 }
@@ -146,7 +147,7 @@ export function getActiveNotes(): number[] {
   }
   
   const notes = activeNotes.map(hex => 
-    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps)
+    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset)
   );
   if (notes.length >= 2) {
     console.log('getActiveNotes returning multiple notes:', notes);

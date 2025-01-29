@@ -204,8 +204,9 @@ export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNod
   }
 }
 
-export function getMidiFromCoords(coords: { x: number; y: number }, rSteps: number, urSteps: number): number {
-  return 60 + // hardcoded C4
+export function getMidiFromCoords(coords: { x: number; y: number }, rSteps: number, urSteps: number, octaveOffset: number = 0): number {
+  return 60 + // C4 base note
+    (octaveOffset * 12) + // Apply octave offset (12 semitones per octave)
     coords.x * rSteps +
     coords.y * urSteps;
 }

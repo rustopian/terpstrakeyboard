@@ -100,6 +100,7 @@ interface Settings {
   invert_updown: boolean;
   showIntervals: boolean;
   showAllNotes: boolean;
+  octaveOffset: number;
 }
 
 // Add WebMidi types
@@ -138,7 +139,6 @@ declare global {
 
 // Global variables
 let myOutput: any = null;
-let current_text_color = "#000000";
 const instruments: Instrument[] = [
   { fileName: "piano", fade: 0.1 },
   { fileName: "harpsichord", fade: 0.2 },
@@ -204,6 +204,7 @@ let settings: Settings = {
   invert_updown: false,
   showIntervals: false,
   showAllNotes: false,
+  octaveOffset: 0,
 };
 
 // Add color saturation update function
@@ -425,20 +426,6 @@ function updatePreviewButtons(): void {
   });
 }
 
-// Add function to apply all color transformations
-function applyColorTransformations(colors: string[]): string[] {
-  // Ensure colors have # prefix
-  const originalColors = colors.map(c => c.startsWith('#') ? c : `#${c}`);
-  
-  // Apply saturation adjustment
-  const saturatedColors = originalColors.map(color => 
-    adjustColorSaturation(color, settings.colorSaturation / 100)
-  );
-  
-  // Apply color vision deficiency transformation
-  return transformColorsForCVD(saturatedColors, settings.colorVisionMode);
-}
-
 // Add keyboard display update function
 export function updateKeyboardDisplay(): void {
   // Update all the settings
@@ -450,10 +437,7 @@ export function updateKeyboardDisplay(): void {
   settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
   settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
   settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
-  
-  // Update text color based on invert setting
-  current_text_color = settings.invert_updown ? "#ffffff" : "#000000";
-  
+    
   // Parse scale and colors
   parseScaleColors();
   
@@ -1279,18 +1263,19 @@ function handlePitchTypeChange(): void {
 
 function handleCentralOctaveChange(): void {
   const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
-  const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
-  
-  if (!octaveSlider || !fundamentalInput) return;
+  if (!octaveSlider) return;
 
-  const octaveShift = parseInt(octaveSlider.value);
-  const baseFreq = parseFloat(fundamentalInput.value);
+  // Store the octave value in settings for use in drawing
+  settings.octaveOffset = parseInt(octaveSlider.value);
+
+  // Redraw the grid with the new octave numbers
+  if (settings.canvas && settings.context) {
+    settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
+    drawGrid();
+  }
   
-  // Store the shifted frequency in settings
-  settings.fundamental = baseFreq * Math.pow(2, octaveShift);
-  
-  // Update the display but keep the input showing the base frequency
-  drawGrid();
+  // Update URL to persist the change
+  changeURL();
 }
 
 // Add scroll area functionality with edge detection
@@ -1302,7 +1287,6 @@ function initScrollArea(): void {
   let isDragging = false;
   let startX = 0;
   let lastX = 0;
-  let viewOffset = 0;
   let isRedrawing = false;
 
   scrollArea.addEventListener('mousedown', (e: Event) => {
