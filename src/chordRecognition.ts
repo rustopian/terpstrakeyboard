@@ -96,16 +96,6 @@ function noteNameToSteps(noteName: string): number {
     }
   }
   
-  console.log('Note name to steps:', {
-    noteName,
-    prefix,
-    baseNote,
-    suffix,
-    baseValue,
-    modifierValue,
-    total: baseValue + modifierValue
-  });
-  
   return baseValue + modifierValue;
 }
 
@@ -129,6 +119,7 @@ function getIntervalName(interval: number): string | null {
 function recognizeChord(notes: number[]): ChordResult | null {
   if (notes.length < 2) return null;
 
+  const bassNote = notes[0] % 53;  // The actual bass note from original notes array
   // Sort and reduce notes to within one octave, removing duplicates
   const uniqueNotes = [...new Set(notes.map(n => n % 53))];
   const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
@@ -154,12 +145,6 @@ function recognizeChord(notes: number[]): ChordResult | null {
     if (reducedRoot < 0) reducedRoot += 53;
     const rootName = (window as any).settings.names[reducedRoot];
 
-    console.log('Trying root:', {
-      potentialRoot,
-      rootName,
-      intervals
-    });
-
     // Convert each chord spelling to its interval pattern and compare
     for (const [quality, spelling] of Object.entries(SETTINGS_53_EDO.CHORD_SPELLINGS)) {
       const pattern = getChordPattern(spelling);
@@ -173,33 +158,41 @@ function recognizeChord(notes: number[]): ChordResult | null {
         sortedIntervals.includes(patternInterval));
 
       if (triadMatch) {
-        // We found a basic chord match
+        // Calculate all chord tones relative to root
+        const chordTones = [reducedRoot];
+        for (const interval of pattern) {
+          let tone = (reducedRoot + interval) % 53;
+          chordTones.push(tone);
+        }
+
+        // Determine inversion by finding which chord tone is in the bass
+        let inversion = 0;
+        const bassPosition = chordTones.indexOf(bassNote);
+        if (bassPosition > 0) {
+          inversion = bassPosition;
+        }
+
         const result = {
           root: rootName,
           quality,
-          inversion: i,
+          inversion,
           additionalIntervals: [] as string[]
         };
 
-        // If we found a match with a lower inversion number, or this is our first match
-        if (!bestResult || i < bestResult.inversion) {
-          // Now look for additional intervals above this specific chord
-          const chordIntervals = new Set(sortedPattern);
-          const additionalIntervals = sortedIntervals
-            .filter(interval => !chordIntervals.has(interval))
-            .map(interval => getIntervalName(interval))
-            .filter((name): name is string => name !== null);
+        // Look for additional intervals above this specific chord
+        const chordIntervals = new Set(sortedPattern);
+        const additionalIntervals = sortedIntervals
+          .filter(interval => !chordIntervals.has(interval))
+          .map(interval => getIntervalName(interval))
+          .filter((name): name is string => name !== null);
 
-          if (additionalIntervals.length > 0) {
-            result.additionalIntervals = additionalIntervals;
-          }
+        if (additionalIntervals.length > 0) {
+          result.additionalIntervals = additionalIntervals;
+        }
 
+        // Update best result if this is our first match or if this root makes more sense
+        if (!bestResult || (additionalIntervals.length < (bestResult.additionalIntervals?.length || 0))) {
           bestResult = result;
-          console.log('Found better match:', {
-            quality,
-            inversion: i,
-            additionalIntervals
-          });
         }
       }
     }
