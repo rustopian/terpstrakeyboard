@@ -7,13 +7,13 @@ export default defineConfig({
   publicDir: 'public',
   server: {
     port: 5173,
-    open: '/public/index.html'
+    open: 'index.html'
   },
   build: {
     outDir: 'dist',
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'public/index.html')
+        main: resolve(__dirname, 'index.html')
       }
     }
   },
