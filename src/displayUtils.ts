@@ -1,7 +1,7 @@
 // Display utility functions for the Terpstra Keyboard WebApp
 import { Point } from './geometry.ts';
 import { hexCoordsToScreen, getHexVertices, getOuterHexVertices } from './hexUtils.ts';
-import { getContrastYIQ, nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, HSVtoRGB2, rgbToHex, rgb } from './colorUtils.ts';
+import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from './colorUtils.ts';
 
 interface Settings {
   context: CanvasRenderingContext2D;
@@ -18,6 +18,7 @@ interface Settings {
   names: string[];
   no_labels: boolean;
   invert_updown: boolean;
+  octaveOffset?: number;
 }
 
 let settings: Settings;
@@ -121,11 +122,11 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
     const scaleFactor = settings.hexSize / 50;
     settings.context.scale(scaleFactor, scaleFactor);
     settings.context.translate(10, -25);
-    settings.context.fillStyle = current_text_color; // Use current_text_color here too
+    settings.context.fillStyle = current_text_color;
     settings.context.font = "12pt Arial";
     settings.context.textAlign = "center";
     settings.context.textBaseline = "middle";
-    settings.context.fillText(equivMultiple.toString(), 0, 0);
+    settings.context.fillText((equivMultiple + (settings.octaveOffset || 0) + 4).toString(), 0, 0);
   }
 
   settings.context.restore();

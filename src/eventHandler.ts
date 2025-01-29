@@ -16,6 +16,7 @@ interface Settings {
   rSteps: number;
   urSteps: number;
   fundamental: number;
+  octaveOffset: number;
   [key: string]: any; // For any additional properties
 }
 
