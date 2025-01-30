@@ -175,6 +175,22 @@ function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO 
   let bestResult: ChordResult | null = null;
   let bestScore = -Infinity;
 
+  // Group chord spellings by number of notes
+  const spellingsBySize = new Map<number, Array<[string, any]>>();
+  for (const [quality, spelling] of Object.entries(tuningSystem.CHORD_SPELLINGS)) {
+    const pattern = Array.isArray(spelling) ? spelling : spelling.spelling;
+    const size = pattern.length;
+    if (!spellingsBySize.has(size)) {
+      spellingsBySize.set(size, []);
+    }
+    spellingsBySize.get(size)!.push([quality, spelling]);
+  }
+
+  // Sort sizes in descending order, but not larger than number of unique notes
+  const sortedSizes = Array.from(spellingsBySize.keys())
+    .filter(size => size <= uniqueNotes.length)
+    .sort((a, b) => b - a);
+
   // Try each note as potential root
   for (let i = 0; i < sortedNotes.length; i++) {
     const potentialRoot = sortedNotes[i];
@@ -191,69 +207,87 @@ function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO 
     const reducedRoot = ((potentialRoot + totalSteps) % totalSteps);
     const rootName = (window as any).settings.names[reducedRoot];
 
-    // Try each chord quality
-    for (const [quality, spelling] of Object.entries(tuningSystem.CHORD_SPELLINGS)) {
-      const pattern = Array.isArray(spelling) ? 
-        getChordPattern(spelling, tuningSystem) : 
-        getChordPattern(spelling.spelling, tuningSystem);
+    // Try each chord size in descending order
+    for (const size of sortedSizes) {
+      const spellingsOfSize = spellingsBySize.get(size) || [];
       
-      const sortedPattern = [...pattern].sort((a, b) => a - b);
-      const sortedIntervals = [...intervals].sort((a, b) => a - b);
+      // Try each chord quality of this size
+      for (const [quality, spelling] of spellingsOfSize) {
+        const pattern = Array.isArray(spelling) ? 
+          getChordPattern(spelling, tuningSystem) : 
+          getChordPattern(spelling.spelling, tuningSystem);
+        
+        const sortedPattern = [...pattern].sort((a, b) => a - b);
+        const sortedIntervals = [...intervals].sort((a, b) => a - b);
+        
+        const triadMatch = sortedPattern.every(patternInterval => 
+          sortedIntervals.includes(patternInterval));
+
+        if (triadMatch) {
+          // Calculate chord tones
+          const chordTones = [reducedRoot];
+          for (const interval of pattern) {
+            let tone = (reducedRoot + interval) % totalSteps;
+            chordTones.push(tone);
+          }
+
+          // Determine inversion
+          let inversion = 0;
+          const bassPosition = chordTones.indexOf(bassNote);
+          if (bassPosition > 0) {
+            inversion = bassPosition;
+          }
+
+          // Find additional intervals
+          const chordIntervals = new Set(sortedPattern);
+          const additionalIntervals = sortedIntervals
+            .filter(interval => !chordIntervals.has(interval))
+            .map(interval => getIntervalName(interval, tuningSystem))
+            .filter((name): name is string => name !== null);
+
+          const result = {
+            root: rootName,
+            quality: Array.isArray(spelling) ? quality : spelling.symbol.replace(/^C/, ''),
+            fullName: Array.isArray(spelling) ? quality : quality.replace(/^C/, ''),
+            inversion,
+            additionalIntervals: additionalIntervals,
+            symbol: Array.isArray(spelling) ? rootName + quality : rootName + spelling.symbol.replace(/^C/, '')
+          };
+
+          // Score based on actual MIDI note distances and chord completeness
+          let score = 0;
+          
+          // Bonus for larger chords
+          score += size * 20;
+          
+          // Bonus for exact matches (no additional intervals)
+          if (additionalIntervals.length === 0) {
+            score += 50;
+          }
+          
+          // Find the root note in the original notes array
+          const rootNote = notes.find(n => n % totalSteps === reducedRoot);
+          if (rootNote !== undefined) {
+            // Prefer roots that are closer to the bass note in actual MIDI distance
+            score -= Math.abs(rootNote - notes[0]);
+          } else {
+            // Heavy penalty if root isn't in the original notes
+            score -= 100;
+          }
+          
+          // Penalty for additional intervals
+          score -= additionalIntervals.length * 10;
+
+          if (score > bestScore) {
+            bestResult = result;
+            bestScore = score;
+          }
+        }
+      }
       
-      const triadMatch = sortedPattern.every(patternInterval => 
-        sortedIntervals.includes(patternInterval));
-
-      if (triadMatch) {
-        // Calculate chord tones
-        const chordTones = [reducedRoot];
-        for (const interval of pattern) {
-          let tone = (reducedRoot + interval) % totalSteps;
-          chordTones.push(tone);
-        }
-
-        // Determine inversion
-        let inversion = 0;
-        const bassPosition = chordTones.indexOf(bassNote);
-        if (bassPosition > 0) {
-          inversion = bassPosition;
-        }
-
-        // Find additional intervals
-        const chordIntervals = new Set(sortedPattern);
-        const additionalIntervals = sortedIntervals
-          .filter(interval => !chordIntervals.has(interval))
-          .map(interval => getIntervalName(interval, tuningSystem))
-          .filter((name): name is string => name !== null);
-
-        const result = {
-          root: rootName,
-          quality: Array.isArray(spelling) ? quality : spelling.symbol.replace(/^C/, ''),
-          fullName: Array.isArray(spelling) ? quality : quality.replace(/^C/, ''),  // Use original quality name
-          inversion,
-          additionalIntervals: additionalIntervals,
-          symbol: Array.isArray(spelling) ? rootName + quality : rootName + spelling.symbol.replace(/^C/, '')
-        };
-
-        // Score based on actual MIDI note distances
-        let score = 0;
-        
-        // Find the root note in the original notes array
-        const rootNote = notes.find(n => n % totalSteps === reducedRoot);
-        if (rootNote !== undefined) {
-          // Prefer roots that are closer to the bass note in actual MIDI distance
-          score -= Math.abs(rootNote - notes[0]);
-        } else {
-          // Heavy penalty if root isn't in the original notes
-          score -= 100;
-        }
-        
-        // Penalty for additional intervals
-        score -= additionalIntervals.length * 10;
-
-        if (score > bestScore) {
-          bestResult = result;
-          bestScore = score;
-        }
+      // If we found a match at this size with no additional intervals, we can stop
+      if (bestResult && bestResult.additionalIntervals?.length === 0) {
+        break;
       }
     }
   }
