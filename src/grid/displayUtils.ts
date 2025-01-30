@@ -1,25 +1,8 @@
 // Display utility functions for the Terpstra Keyboard WebApp
-import { Point } from './geometry.ts';
-import { hexCoordsToScreen, getHexVertices, getOuterHexVertices } from './hexUtils.ts';
-import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from './colorUtils.ts';
-
-interface Settings {
-  context: CanvasRenderingContext2D;
-  hexSize: number;
-  rotation: number;
-  spectrum_colors: boolean;
-  keycolors: { [key: number]: string };
-  fundamental_color: string;
-  rSteps: number;
-  urSteps: number;
-  enum: boolean;
-  equivSteps: number;
-  scale: number[];
-  names: string[];
-  no_labels: boolean;
-  invert_updown: boolean;
-  octaveOffset?: number;
-}
+import { Point } from '../core/geometry';
+import { hexCoordsToScreen, getHexVertices, getOuterHexVertices, hexCoordsToCents } from './hexUtils';
+import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils';
+import { Settings, CentsResult } from '../core/types';
 
 let settings: Settings;
 export let current_text_color = "#000000";
@@ -28,8 +11,8 @@ export function initDisplayUtils(appSettings: Settings): void {
   settings = appSettings;
 }
 
-export function drawHex(p: Point, c: string): void {
-  const hexCenter = hexCoordsToScreen(p);
+export function drawHex(coords: Point, color?: string): void {
+  const hexCenter = hexCoordsToScreen(coords);
 
   // Calculate hex vertices
   const { x, y } = getHexVertices(hexCenter, settings.hexSize);
@@ -41,7 +24,7 @@ export function drawHex(p: Point, c: string): void {
     settings.context.lineTo(x[i], y[i]);
   }
   settings.context.closePath();
-  settings.context.fillStyle = c;
+  settings.context.fillStyle = color || settings.keycolors[coords.x * settings.rSteps + coords.y * settings.urSteps];
   settings.context.fill();
 
   // Save context and create a hex shaped clip
@@ -85,7 +68,7 @@ export function drawHex(p: Point, c: string): void {
   settings.context.strokeStyle = 'black';
   settings.context.stroke();
 
-  drawHexLabel(p, hexCenter);
+  drawHexLabel(coords, hexCenter);
 }
 
 function drawHexLabel(p: Point, hexCenter: Point): void {
@@ -132,15 +115,10 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
   settings.context.restore();
 }
 
-interface CentsObj {
-  cents: number;
-  reducedSteps: number;
-}
-
-export function centsToColor(centsObj: number | CentsObj, pressed: boolean): string {
+export function centsToColor(centsObj: CentsResult, isActive: boolean = false): string {
   let returnColor: string | number[];
-  const centsValue = typeof centsObj === 'object' ? centsObj.cents : centsObj;
-  const reducedSteps = typeof centsObj === 'object' ? centsObj.reducedSteps : undefined;
+  const centsValue = centsObj.cents;
+  const reducedSteps = centsObj.reducedSteps;
 
   // Set text color based on invert setting, regardless of other conditions
   current_text_color = settings?.invert_updown ? "#ffffff" : "#000000";
@@ -171,7 +149,7 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
     }
 
     // Handle pressed state
-    if (pressed) {
+    if (isActive) {
       if (settings.invert_updown) {
         // In inverted mode, lighten when pressed
         returnColor[0] = Math.min(255, returnColor[0] + 90);
@@ -204,7 +182,7 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
   let baseV = settings.invert_updown ? v * 0.5 : v;
 
   // Handle pressed state
-  if (pressed) {
+  if (isActive) {
     if (settings.invert_updown) {
       // In inverted mode, increase value when pressed
       baseV = baseV * 2;
@@ -215,4 +193,40 @@ export function centsToColor(centsObj: number | CentsObj, pressed: boolean): str
   }
 
   return HSVtoRGB(h, s, baseV);
+}
+
+export function drawGrid(): void {
+  if (!settings.centerpoint || !settings.hexSize) return;
+
+  // Calculate visible area bounds with generous padding
+  const padding = 20; // More hexes beyond visible area
+  const width = window.innerWidth;
+  const height = window.innerHeight - 50;
+  
+  // Calculate how many hexes fit in view (plus padding)
+  const hexesAcrossHalf = Math.ceil((width / settings.hexWidth)) + padding;
+  const hexesVerticalHalf = Math.ceil((height / settings.hexVert)) + padding;
+  
+  // Calculate grid bounds relative to centerpoint
+  const viewCenterX = settings.centerpoint.x;
+  const viewCenterY = settings.centerpoint.y;
+  
+  // Calculate hex coordinates range with offset based on view center
+  const centerOffsetX = Math.floor(viewCenterX / settings.hexWidth);
+  const centerOffsetY = Math.floor(viewCenterY / settings.hexVert);
+  
+  const minR = -hexesAcrossHalf + centerOffsetX;
+  const maxR = hexesAcrossHalf + centerOffsetX;
+  const minUR = -hexesVerticalHalf + centerOffsetY;
+  const maxUR = hexesVerticalHalf + centerOffsetY;
+  
+  // Draw the grid
+  for (let r = minR; r <= maxR; r++) {
+    for (let ur = minUR; ur <= maxUR; ur++) {
+      const coords = new Point(r, ur);
+      const centsObj = hexCoordsToCents(coords);
+      const color = centsToColor(centsObj, false);
+      drawHex(coords, color);
+    }
+  }
 } 

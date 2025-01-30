@@ -1,5 +1,5 @@
-import { playNote, stopNote, getMidiFromCoords } from './audioHandler.ts';
-import { Point } from './geometry.ts';
+import { playNote, stopNote, getMidiFromCoords } from './audioHandler';
+import { Point } from '../core/geometry';
 import { updateChordDisplay } from './chordRecognition';
 
 declare global {

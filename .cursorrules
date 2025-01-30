@@ -1,0 +1,217 @@
+# Terpstra Keyboard Web Application Rules and Guidelines
+
+## Application Overview
+This is a microtonal musical keyboard web application based on the Terpstra hexagonal keyboard layout. It supports arbitrary tuning systems, multiple instruments, and various display modes. The app is designed to be highly configurable while maintaining precise musical accuracy. The following requirements are generally already met; ensure that they are not violated as we make further updates.
+
+## Core Principles
+
+### 1. Musical Theory Considerations
+- DO NOT assume 12-tone equal temperament (12-TET)
+- DO NOT hardcode octave sizes or intervals
+- DO NOT assume Western music concepts like "major/minor" or standard note names. However, many tunings may use standard note names and different kinds of majors and minors.
+- ALWAYS use the provided scale and interval data from settings (presets). The tuningTypes file is limited only to a couple of settings and is used only for chord detection and naming.
+- REMEMBER that notes, intervals, and octaves can be arbitrary divisions
+- CONSIDER that the fundamental frequency and tuning system are user-configurable
+- UNDERSTAND that musical ratios, cents values, and sometimes "steps" are the foundation, not semitones
+
+### 2. Audio Handling
+- Audio timing must be precise - use the Web Audio API's timing system
+- Sample loading is critical - handle all error cases gracefully
+- Multiple simultaneous notes must be supported
+- MIDI output must maintain exact timing
+- Audio buffer management must be memory-efficient
+- Sample playback must handle arbitrary pitch shifts
+- Consider CPU and memory impact of polyphony
+- Handle audio context suspension/resumption gracefully
+
+### 3. Display and UI
+- The hexagonal grid is the core UI element
+- Grid coordinates use a 2D axial coordinate system (r, ur)
+- Colors can indicate intervals, note functions, or be customized
+- Text display must handle arbitrary note names
+- Touch and mouse interactions must be precise
+- OS scroll and gesture events which could interfere with keyboard input must be ignored
+- Colorblind accessibility modes are included
+- The keyboard supports dynamic resizing and rotation
+- Maintain consistent performance during scrolling
+- Scrolling is always a simple horizontal scroll. This, unless the user indicates specifically otherwise, should not be modified.
+- Handle high-DPI displays correctly
+
+### 4. State Management
+- Settings are the source of truth for all musical parameters
+- URL parameters persist user configurations
+- Multiple note input methods (keyboard, mouse, touch) must coexist
+- State changes must trigger appropriate UI updates
+- Handle presets without breaking custom configurations
+- Maintain state consistency across components
+- Persist necessary state in URL without bloat
+- Handle state transitions smoothly
+
+## Technical Architecture
+
+### 1. Core Systems
+- Grid System: Hexagonal coordinate system with axial coordinates
+- Audio System: Web Audio API with sample-based playback
+- Event System: Multi-touch, mouse, and keyboard handling
+- Settings System: URL-based persistence and preset management
+
+### 2. Component Architecture
+- React Components: Used for UI overlays and settings
+- Canvas Rendering: Core grid display and interaction
+- Audio Engine: Sample management and playback
+- Event Manager: Input coordination and routing
+
+### 3. Data Flow
+- Settings → Grid Layout → Display
+- User Input → Event Manager → Audio Engine
+- Presets → Settings Manager → State Update
+- State Changes → URL Updates → Persistence
+
+## Recent Architectural Changes
+1. Vite Integration
+   - Maintained vanilla JS for core audio and grid functionality
+
+2. Color Management
+   - Moved color handling to dedicated modules
+   - Added support for color vision deficiency modes
+   - Implemented color saturation control
+
+3. Settings Management
+   - Centralized settings in TypeScript interfaces
+   - Added strong typing for all parameters
+   - Improved preset handling
+
+## Common Pitfalls to Avoid
+
+1. Musical Assumptions
+   - DON'T assume Western music concepts
+   - DON'T hardcode musical intervals
+   - DON'T assume octave equivalence (though it is often true)
+   - DON'T assume standard note names (though they are often used)
+
+2. Technical Issues
+   - DON'T modify the coordinate system without understanding hex grid math
+   - DON'T change audio timing without thorough testing
+   - DON'T modify URL parameter handling without checking presets
+   - DON'T change event handling without testing all input methods
+
+3. UI Considerations
+   - DON'T remove touch event handlers
+   - DON'T modify grid drawing without understanding WebGL/Canvas
+   - DON'T change color systems without considering accessibility
+   - DON'T modify layout without testing mobile responsiveness
+
+## Making Changes
+
+1. Before Making Changes:
+   - Understand the musical theory implications
+   - Test with multiple tuning systems
+   - Consider accessibility impact
+   - Test on multiple devices/browsers
+   - Verify MIDI compatibility
+
+2. Required Testing:
+   - Multiple simultaneous notes
+   - Different screen sizes
+   - Touch and mouse input
+   - Various tuning systems
+   - All instrument samples
+   - Color vision modes
+   - URL parameter persistence
+
+3. Documentation Requirements:
+   - Update TypeScript interfaces
+   - Document musical theory implications
+   - Note accessibility considerations
+   - Explain coordinate system changes
+   - Document new settings parameters
+
+## Critical Files
+
+1. Core Functionality:
+   - src/core/types.ts: Core type definitions and interfaces
+   - src/core/geometry.ts: Geometry and coordinate system utilities
+   - src/core/QueryData.ts: URL parameter handling
+
+2. Audio System:
+   - src/audio/audioHandler.ts: Audio playback and sample management
+   - src/audio/activeHex.ts: Active note management and MIDI
+   - src/audio/chordRecognition.ts: Chord detection and naming
+
+3. Grid System:
+   - src/grid/hexUtils.ts: Hexagonal grid calculations
+   - src/grid/displayUtils.ts: Canvas rendering and display
+
+4. UI Components:
+   - src/ui/ScrollManager.ts: Grid navigation and scrolling
+   - src/ui/eventHandler.ts: Input handling (keyboard, mouse, touch)
+   - src/ChordDisplay.tsx: React chord display component
+
+5. Settings and State:
+   - src/settings/Settings.ts: Core settings interface and defaults
+   - src/settings/SettingsManager.ts: Settings management and persistence
+
+6. Color Management:
+   - src/color/colorTransform.ts: Color vision deficiency transformations
+   - src/color/colorUtils.ts: Color manipulation utilities
+
+7. Styles:
+   - public/styles/terpstra-style.css: Core application styles
+   - public/styles/normalize.css: CSS normalization
+   - public/styles/skeleton.css: Base CSS framework
+
+## Project Structure
+
+### Core Module (/src/core)
+- Contains fundamental types, interfaces, and utilities
+- Handles geometry calculations and coordinate systems
+- Manages URL parameters and query data
+
+### Audio Module (/src/audio)
+- Manages Web Audio API integration
+- Handles sample loading and playback
+- Processes MIDI input/output
+- Implements chord recognition
+
+### Grid Module (/src/grid)
+- Implements hexagonal grid system
+- Manages canvas rendering
+- Handles display utilities
+
+### UI Module (/src/ui)
+- Manages user interactions
+- Implements scrolling and navigation
+- Handles event management
+
+### Settings Module (/src/settings)
+- Centralizes application settings
+- Manages state persistence
+- Handles presets and configurations
+
+### Color Module (/src/color)
+- Implements color transformations
+- Supports accessibility features
+- Manages color schemes and palettes
+
+## Performance Considerations
+1. Audio Performance
+   - Buffer management is critical for memory usage
+   - Sample loading must be efficient and cached
+   - Audio processing must be real-time capable
+   - Handle multiple simultaneous notes efficiently
+
+2. Visual Performance
+   - Grid rendering must maintain 60fps
+   - Scroll performance must be smooth
+   - Canvas operations should be optimized
+   - Handle window resizing efficiently
+
+## Browser Compatibility
+- Support modern browsers (Chrome, Firefox, Safari, Edge)
+- Handle touch events consistently across platforms
+- Account for different audio implementation quirks
+- Support both desktop and mobile devices
+- Handle high-DPI displays properly
+- Consider PWA capabilities
+
+Remember: This is a precision musical instrument in software form. Changes must be made with careful consideration of musical accuracy, performance, and user experience. The application must maintain its flexibility to support diverse musical systems while providing a responsive and accurate interface for musical expression. 

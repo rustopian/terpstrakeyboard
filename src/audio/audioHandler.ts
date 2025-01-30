@@ -1,7 +1,4 @@
-interface Instrument {
-  fileName: string;
-  fade: number;
-}
+import { Instrument } from '../core/types';
 
 export const instruments: Instrument[] = [
   { fileName: "piano", fade: 0.1 },
@@ -217,4 +214,52 @@ export function setSampleFadeout(fadeout: number): void {
 
 export function getAudioContext(): AudioContext | undefined {
   return audioContext;
+}
+
+export function loadInstrumentSamples(): void {
+  const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
+  const instrumentOption = instrumentSelect ? instrumentSelect.selectedIndex : 0;
+  console.log("[DEBUG] Selected instrument index:", instrumentOption);
+
+  if (instrumentSelect && instrumentSelect.querySelector(':checked')?.parentElement instanceof HTMLOptGroupElement) {
+    const parentElement = instrumentSelect.querySelector(':checked')?.parentElement as HTMLOptGroupElement;
+    if (parentElement.label === 'MIDI out') {
+      const selectedOption = instrumentSelect.querySelector(':checked');
+      if (selectedOption?.textContent) {
+        window.WebMidi.getOutputByName(selectedOption.textContent);
+        console.log("[DEBUG] MIDI output selected:", window.WebMidi.getOutputByName(selectedOption.textContent));
+        if (window.WebMidi.getOutputByName(selectedOption.textContent)) {
+          window.WebMidi.getOutputByName(selectedOption.textContent).sendAllSoundOff();
+        }
+      }
+      return;
+    }
+  }
+
+  let instrumentToLoad = instruments[instrumentOption];
+  if (!instrumentToLoad) {
+    console.error("[DEBUG] No instrument selected, defaulting to piano");
+    instrumentToLoad = instruments[0]; // Default to piano
+  }
+  console.log("[DEBUG] Selected instrument:", {
+    index: instrumentOption,
+    name: instrumentToLoad.fileName,
+    fade: instrumentToLoad.fade
+  });
+  
+  // Load the samples
+  try {
+    console.log("[DEBUG] About to load samples:", {
+      instrument: instrumentToLoad.fileName,
+      fade: instrumentToLoad.fade
+    });
+    loadSample(instrumentToLoad.fileName, 0);
+    setSampleFadeout(instrumentToLoad.fade);
+  } catch (error) {
+    console.error("[DEBUG] Error loading samples:", error);
+    // Try loading piano as fallback
+    console.log("[DEBUG] Attempting to load piano as fallback...");
+    loadSample("piano", 0);
+    setSampleFadeout(0.1);
+  }
 } 

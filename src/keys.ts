@@ -1,107 +1,41 @@
 // Import geometry functions
 import {
   Point,
-  calculateRotationMatrix,
-} from './geometry';
+} from './core/geometry';
 
 // Import audio functions
 import {
   initAudio,
-  setSampleFadeout,
-  loadSample
-} from './audioHandler';
+  loadInstrumentSamples,
+} from './audio/audioHandler';
 
 // Import event handling functions
 import {
   initEventHandlers,
-} from './eventHandler';
+} from './ui/eventHandler';
 
 // Import hex utility functions
 import {
   initHexUtils,
-  hexCoordsToCents,
-} from './hexUtils';
+} from './grid/hexUtils';
 
 // Import display utility functions
 import {
   initDisplayUtils,
-  centsToColor,
-  drawHex
-} from './displayUtils';
+  drawGrid
+} from './grid/displayUtils';
 
-// Import query data
-import { QueryData } from './QueryData';
+// Import types
+import { Settings, QueryDataInterface } from './core/types';
 
-// Import color transformation functions
-import { transformColorsForCVD, transformColorForCVD, ColorVisionType } from './colorTransform';
-import { hex2rgb, adjustColorSaturation } from './colorUtils';
+// Import query data parser
+import { QueryData } from './core/QueryData';
 
-// Type definitions
-interface Instrument {
-  fileName: string;
-  fade: number;
-}
+// Import scroll manager
+import { ScrollManager } from './ui/ScrollManager';
 
-interface QueryDataInterface {
-  [key: string]: any;
-  instrument?: string;
-  fundamental?: number;
-  right?: number;
-  upright?: number;
-  size?: number;
-  rotation?: number;
-  enum?: boolean;
-  equivSteps?: number;
-  spectrum_colors?: boolean;
-  fundamental_color?: string;
-  no_labels?: boolean;
-  scale?: string[];
-  names?: string[];
-  note_colors?: string[];
-}
-
-interface Settings {
-  scale: number[];
-  equivInterval: number;
-  keycolors: string[];
-  canvas: HTMLCanvasElement;
-  context: CanvasRenderingContext2D;
-  centerpoint: Point;
-  rotationMatrix: [number, number, number, number, number, number];
-  fundamental: number;
-  rSteps: number;
-  urSteps: number;
-  hexSize: number;
-  rotation: number;
-  hexHeight: number;
-  hexVert: number;
-  hexWidth: number;
-  names: string[];
-  enum: boolean;
-  equivSteps: number;
-  no_labels: boolean;
-  spectrum_colors: boolean;
-  fundamental_color: string;
-  audioContext?: AudioContext;
-  sustain: boolean;
-  sustainedNotes: any[];
-  activeHexObjects: any[];
-  pressedKeys: number[];
-  keyCodeToCoords: { [key: number]: Point };
-  isMouseDown: boolean;
-  isTouchDown: boolean;
-  midi_enabled: boolean;
-  audioBuffer?: AudioBuffer;
-  activeSources: { [key: number]: { source: AudioBufferSourceNode; gainNode: GainNode } };
-  fadeoutTime: number;
-  sampleBuffer: (AudioBuffer | undefined)[];
-  colorVisionMode: ColorVisionType;
-  colorSaturation: number;
-  invert_updown: boolean;
-  showIntervals: boolean;
-  showAllNotes: boolean;
-  octaveOffset: number;
-}
+// Import settings manager
+import { SettingsManager } from './settings/SettingsManager';
 
 // Add WebMidi types
 declare global {
@@ -138,32 +72,6 @@ declare global {
 }
 
 // Global variables
-let myOutput: any = null;
-const instruments: Instrument[] = [
-  { fileName: "piano", fade: 0.1 },
-  { fileName: "harpsichord", fade: 0.2 },
-  { fileName: "rhodes", fade: 0.1 },
-  { fileName: "harp", fade: 0.2 },
-  { fileName: "choir", fade: 0.5 },
-  { fileName: "strings", fade: 0.9 },
-  { fileName: "sawtooth", fade: 0.2 },
-  { fileName: "gayageum", fade: 1 },
-  { fileName: "qanun", fade: 1 },
-  { fileName: "organ", fade: 0.1 },
-  { fileName: "organleslie", fade: 0.1 },
-  { fileName: "marimba", fade: 0.1 },
-  { fileName: "musicbox", fade: 0.1 },
-  { fileName: "WMRI3LST", fade: 0.1 },
-  { fileName: "WMRI5LST", fade: 0.1 },
-  { fileName: "WMRI5Lpike", fade: 0.1 },
-  { fileName: "WMRI7LST", fade: 0.1 },
-  { fileName: "WMRI11LST", fade: 0.1 },
-  { fileName: "WMRI13LST", fade: 0.1 },
-  { fileName: "WMRInLST", fade: 0.1 },
-  { fileName: "WMRIByzantineST", fade: 0.1 },
-  { fileName: "WMRI-in6-har7-", fade: 0.1 },
-  { fileName: "WMRI-in7-har6-", fade: 0.1 }
-];
 let settings: Settings = {
   scale: [],
   equivInterval: 0,
@@ -207,44 +115,36 @@ let settings: Settings = {
   octaveOffset: 0,
 };
 
+// Initialize settings manager
+const settingsManager = new SettingsManager();
+settings = settingsManager.getSettings(); // Get initial settings
+
+// Initialize scroll manager instance
+let scrollManager: ScrollManager | null = null;
+
 // Add color saturation update function
 function updateColorSaturation(): void {
-  const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
-  if (saturationSlider) {
-    settings.colorSaturation = parseInt(saturationSlider.value);
-    updatePreviewButtons();
-    updateKeyboardDisplay();
-  }
+  settingsManager.updateColorSaturation();
+  settings = settingsManager.getSettings();
 }
 
 // Add color vision mode update function
 function updateColorVisionMode(): void {
-  const select = document.getElementById('color-vision-mode') as HTMLSelectElement;
-  settings.colorVisionMode = select.value as ColorVisionType;
-  
-  // Transform colors based on selected mode
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  if (noteColorsElement) {
-    const originalColors = noteColorsElement.value.split('\n').map(c => `#${c}`);
-    const transformedColors = transformColorsForCVD(originalColors, settings.colorVisionMode);
-    settings.keycolors = transformedColors.map(c => c.substring(1));
-  }
-  
-  updatePreviewButtons();
-  updateKeyboardDisplay();
+  settingsManager.updateColorVisionMode();
+  settings = settingsManager.getSettings();
 }
 
 // Make functions available globally
 window.back = back;
 window.settings = settings;
 window.changeURL = changeURL;
-window.noPreset = noPreset;
-window.hideRevealColors = hideRevealColors;
-window.hideRevealNames = hideRevealNames;
-window.hideRevealEnum = hideRevealEnum;
+window.noPreset = () => settingsManager.noPreset();
+window.hideRevealColors = () => settingsManager.hideRevealColors();
+window.hideRevealNames = () => settingsManager.hideRevealNames();
+window.hideRevealEnum = () => settingsManager.hideRevealEnum();
 window.updateColorVisionMode = updateColorVisionMode;
 window.updateColorSaturation = updateColorSaturation;
-window.updateKeyboardDisplay = updateKeyboardDisplay;
+window.updateKeyboardDisplay = () => settingsManager.updateKeyboardDisplay();
 
 if (window.WebMidi) {
   // Only enable WebMidi if the checkbox is checked
@@ -295,9 +195,14 @@ function onEnabled(): void {
     setTimeout(() => { goKeyboard(); }, 1500);
   }
 
+  // Add beforeunload handler to clean up MIDI
   window.addEventListener('beforeunload', (_event: BeforeUnloadEvent) => {
-    if (myOutput) {
-      myOutput.sendAllSoundOff();
+    const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
+    if (instrumentSelect && window.WebMidi.enabled) {
+      const midiOutput = window.WebMidi.getOutputByName(instrumentSelect.value);
+      if (midiOutput) {
+        midiOutput.sendAllSoundOff();
+      }
     }
   });
 }
@@ -308,7 +213,7 @@ if (decodeURIComponent(window.location.search) === '') {
   init_keyboard_onload = false;
 }
 
-checkPreset(16);
+settingsManager.checkPreset(16);
 
 // Fill in form
 const settingsForm = document.getElementById('settingsForm') as HTMLFormElement;
@@ -370,157 +275,9 @@ if ("note_colors" in getData && getData.note_colors) {
   }
 }
 
-hideRevealNames();
-hideRevealColors();
-hideRevealEnum();
-
-// Update preview buttons function
-function updatePreviewButtons(): void {
-  const namesElement = document.getElementById('names') as HTMLTextAreaElement;
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  const noteButtons = document.querySelector('.note-buttons');
-  
-  if (!namesElement || !noteColorsElement || !noteButtons) return;
-  
-  const names = namesElement.value.split('\n');
-  const colors = noteColorsElement.value.split('\n');
-  
-  // Clear existing buttons
-  noteButtons.innerHTML = '';
-  
-  // Apply all color transformations
-  const transformedColors = colors.map(c => {
-    // Ensure color has # prefix
-    const hexColor = c.startsWith('#') ? c : `#${c}`;
-    
-    // Apply saturation adjustment first
-    const saturatedColor = adjustColorSaturation(hexColor, settings.colorSaturation / 100);
-    
-    // Then apply color vision deficiency transformation
-    return transformColorForCVD(saturatedColor, settings.colorVisionMode);
-  });
-  
-  // Create new preview buttons
-  names.forEach((name, index) => {
-    const button = document.createElement('button');
-    button.className = 'note-button';
-    
-    // Apply the transformed color
-    const baseColor = transformedColors[index] || '#ffffff';
-    
-    // Apply invert up/down if needed
-    if (settings.invert_updown) {
-      // Convert to RGB to darken
-      const rgb = hex2rgb(baseColor);
-      const darkenedColor = `rgb(${Math.max(0, rgb[0] - 90)}, ${Math.max(0, rgb[1] - 90)}, ${Math.max(0, rgb[2] - 90)})`;
-      button.style.backgroundColor = darkenedColor;
-      button.style.color = '#ffffff';
-    } else {
-      button.style.backgroundColor = baseColor;
-      button.style.color = '#000000';
-    }
-    
-    button.textContent = name;
-    button.disabled = true; // Make buttons non-interactive
-    noteButtons.appendChild(button);
-  });
-}
-
-// Add keyboard display update function
-export function updateKeyboardDisplay(): void {
-  // Update all the settings
-  settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
-  settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement).checked;
-  settings.enum = (document.getElementById('enum') as HTMLInputElement).checked;
-  settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
-  settings.names = (document.getElementById('names') as HTMLTextAreaElement).value.split('\n');
-  settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
-  settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
-  settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
-    
-  // Parse scale and colors
-  parseScaleColors();
-  
-  // Clear and redraw the entire grid
-  if (settings.canvas && settings.context) {
-    settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
-    drawGrid();
-  }
-}
-
-function hideRevealNames(): void {
-  const enumCheckbox = document.getElementById("enum") as HTMLInputElement;
-  const equivStepsElement = document.getElementById("equivSteps") as HTMLElement;
-  const namesElement = document.getElementById("names") as HTMLElement;
-  const numberLabel = document.getElementById("numberLabel") as HTMLElement;
-  const namesLabel = document.getElementById("namesLabel") as HTMLElement;
-
-  if (enumCheckbox && enumCheckbox.checked) {
-    if (equivStepsElement) equivStepsElement.style.display = 'block';
-    if (namesElement) namesElement.style.display = 'none';
-    if (numberLabel) numberLabel.style.display = 'block';
-    if (namesLabel) namesLabel.style.display = 'none';
-  } else {
-    if (equivStepsElement) equivStepsElement.style.display = 'none';
-    if (namesElement) namesElement.style.display = 'block';
-    if (numberLabel) numberLabel.style.display = 'none';
-    if (namesLabel) namesLabel.style.display = 'block';
-  }
-  changeURL();
-  updateKeyboardDisplay();
-}
-
-function hideRevealColors(): void {
-  const spectrumColorsCheckbox = document.getElementById("spectrum_colors") as HTMLInputElement;
-  const fundamentalColorElement = document.getElementById("fundamental_color") as HTMLElement;
-  const fundamentalColorLabel = document.getElementById("fundamental_colorLabel") as HTMLElement;
-  const noteColorsElement = document.getElementById("note_colors") as HTMLElement;
-  const noteColorsLabel = document.getElementById("note_colorsLabel") as HTMLElement;
-
-  if (spectrumColorsCheckbox && spectrumColorsCheckbox.checked) {
-    if (fundamentalColorElement) fundamentalColorElement.style.display = 'block';
-    if (fundamentalColorLabel) fundamentalColorLabel.style.display = 'block';
-    if (noteColorsElement) noteColorsElement.style.display = 'none';
-    if (noteColorsLabel) noteColorsLabel.style.display = 'none';
-  } else {
-    if (fundamentalColorElement) fundamentalColorElement.style.display = 'none';
-    if (fundamentalColorLabel) fundamentalColorLabel.style.display = 'none';
-    if (noteColorsElement) noteColorsElement.style.display = 'block';
-    if (noteColorsLabel) noteColorsLabel.style.display = 'block';
-  }
-  changeURL();
-  updateKeyboardDisplay();
-}
-
-function hideRevealEnum(): void {
-  const noLabelsCheckbox = document.getElementById("no_labels") as HTMLInputElement;
-  const enumCheckbox = document.getElementById("enum") as HTMLInputElement;
-  const equivStepsElement = document.getElementById("equivSteps") as HTMLElement;
-  const namesElement = document.getElementById("names") as HTMLElement;
-  const numberLabel = document.getElementById("numberLabel") as HTMLElement;
-  const namesLabel = document.getElementById("namesLabel") as HTMLElement;
-
-  if (noLabelsCheckbox && noLabelsCheckbox.checked) {
-    if (enumCheckbox) enumCheckbox.disabled = true;
-    if (equivStepsElement) equivStepsElement.style.display = 'none';
-    if (namesElement) namesElement.style.display = 'none';
-    if (numberLabel) numberLabel.style.display = 'none';
-    if (namesLabel) namesLabel.style.display = 'none';
-  } else {
-    if (enumCheckbox) {
-      enumCheckbox.disabled = false;
-      if (!enumCheckbox.checked) {
-        if (namesLabel) namesLabel.style.display = 'block';
-        if (namesElement) namesElement.style.display = 'block';
-      } else {
-        if (equivStepsElement) equivStepsElement.style.display = 'block';
-        if (numberLabel) numberLabel.style.display = 'block';
-      }
-    }
-  }
-  changeURL();
-  updateKeyboardDisplay();
-}
+settingsManager.hideRevealNames();
+settingsManager.hideRevealColors();
+settingsManager.hideRevealEnum();
 
 function changeURL(): void {
   let url = window.location.pathname + "?";
@@ -567,77 +324,15 @@ function changeURL(): void {
   window.history.replaceState({}, '', url);
 }
 
-function parseScale(): void {
-  settings.scale = [];
-  const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
-  if (!scaleElement) return;
-
-  const scaleLines = scaleElement.value.split('\n');
-  scaleLines.forEach((line) => {
-    if (line.match(/^[1234567890.\s/]+$/) && !line.match(/^\s+$/)) {
-      if (line.match(/\//)) {
-        // Ratio
-        const [num, den] = line.split('/').map(n => parseInt(n));
-        const ratio = 1200 * Math.log(num / den) / Math.log(2);
-        settings.scale.push(ratio);
-      } else if (line.match(/\./)) {
-        // Cents
-        settings.scale.push(parseFloat(line));
-      }
-    }
-  });
-  settings.equivInterval = settings.scale.pop() || 0;
-  settings.scale.unshift(0);
-}
-
-function parseScaleColors(): void {
-  settings.keycolors = [];
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  if (!noteColorsElement) return;
-
-  const originalColors = noteColorsElement.value.split('\n').map(c => `#${c}`);
-  
-  // Apply saturation adjustment before color vision transformation
-  const saturatedColors = originalColors.map(color => adjustColorSaturation(color, settings.colorSaturation / 100));
-  const transformedColors = transformColorsForCVD(saturatedColors, settings.colorVisionMode);
-  settings.keycolors = transformedColors.map(c => c.substring(1));
-}
-
 function resizeHandler(): void {
-  const newWidth = window.innerWidth;
-  const newHeight = window.innerHeight - 50;  // Account for scroll area
-
-  if (!settings.canvas || !settings.context) return;
-
-  // Set canvas dimensions
-  settings.canvas.width = newWidth;
-  settings.canvas.height = newHeight;
-  settings.canvas.style.width = '100%';
-  settings.canvas.style.height = '100%';
-  settings.canvas.style.margin = '0';
-
-  // Calculate centerpoint
-  settings.centerpoint = new Point(newWidth / 2, newHeight / 2);
-
-  // Calculate hex dimensions based on user's hex size setting
-  settings.hexHeight = settings.hexSize * 2;
-  settings.hexVert = settings.hexHeight * 3 / 4;
-  settings.hexWidth = Math.sqrt(3) / 2 * settings.hexHeight;
-
-  // Rotate about centerpoint
-  if (settings.rotationMatrix) {
-    settings.context.restore();
-  }
-  settings.context.save();
-
-  settings.rotationMatrix = calculateRotationMatrix(-settings.rotation, settings.centerpoint);
-
-  const m = calculateRotationMatrix(settings.rotation, settings.centerpoint);
-  settings.context.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
-
+  settingsManager.updateDimensions();
+  settings = settingsManager.getSettings();
+  
   // Clear and redraw
-  settings.context.clearRect(0, 0, newWidth, newHeight);
-  drawGrid();
+  if (settings.canvas && settings.context) {
+    settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
+    drawGrid();
+  }
 }
 
 function showSettings(): void {
@@ -675,16 +370,9 @@ function goKeyboard(): boolean {
 
   // Hide settings and show keyboard
   hideSettings();
-  const keyboard = document.getElementById("keyboard") as HTMLCanvasElement;
-  if (keyboard) {
-    keyboard.style.display = "block";
-    // Set initial canvas size
-    keyboard.width = window.innerWidth;
-    keyboard.height = window.innerHeight - 50;
-    keyboard.style.width = '100%';
-    keyboard.style.height = '100%';
-    keyboard.style.margin = '0';
-  }
+  
+  // Initialize canvas using SettingsManager
+  settingsManager.initializeCanvas();
 
   // Reset all pressed states
   settings.pressedKeys = [];
@@ -725,32 +413,13 @@ function goKeyboard(): boolean {
     });
   }
 
-  // Set up settings constants
-  settings.fundamental = parseFloat((document.getElementById("fundamental") as HTMLInputElement).value);
-  settings.rSteps = parseInt((document.getElementById("rSteps") as HTMLInputElement).value);
-  settings.urSteps = settings.rSteps - parseInt((document.getElementById("urSteps") as HTMLInputElement).value);
-  settings.hexSize = parseInt((document.getElementById("hexSize") as HTMLInputElement).value);
-  settings.rotation = (parseFloat((document.getElementById("rotation") as HTMLInputElement).value) * 2 * Math.PI) / 360;
+  // Load settings from form
+  settingsManager.loadFromForm();
+  settings = settingsManager.getSettings();
 
-  parseScale();
-  parseScaleColors();
-  settings.names = (document.getElementById('names') as HTMLInputElement).value.split('\n');
-  settings.enum = (document.getElementById('enum') as HTMLInputElement).checked;
-  settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
-  settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
-
-  settings.canvas = document.getElementById('keyboard') as HTMLCanvasElement;
-  settings.context = settings.canvas.getContext('2d')!;
-
-  settings.hexHeight = settings.hexSize * 2;
-  settings.hexVert = settings.hexHeight * 3 / 4;
-  settings.hexWidth = Math.sqrt(3) / 2 * settings.hexHeight;
-
-  settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
-  settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement).checked;
-  settings.fundamental_color = (document.getElementById('fundamental_color') as HTMLInputElement).value;
-  settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
-  settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
+  // Parse scale and colors
+  settingsManager.parseScale();
+  settingsManager.parseScaleColors();
 
   // Initialize display utils
   initDisplayUtils(settings);
@@ -770,613 +439,129 @@ function goKeyboard(): boolean {
 }
 
 window.addEventListener('load', () => {
-  loadPresets();
-  
-  // Initialize scroll area
-  initScrollArea();
-  
-  // Initialize audio context immediately
-  const ctx = initAudio();
-  if (ctx) {
-    settings.audioContext = ctx;
-    console.log("[DEBUG] Audio context initialized on load:", ctx.state);
-  }
-  
-  // Add settings button handler
-  document.getElementById('settings-button')?.addEventListener('click', showSettings);
-  
-  // Add click handler to close modal when clicking overlay
-  document.querySelector('.modal-overlay')?.addEventListener('click', (event) => {
-    if (event.target === event.currentTarget) {
-      hideSettings();
-    }
-  });
-  
-  // Add MIDI input checkbox handler
-  document.getElementById('midi_input')?.addEventListener('change', (event) => {
-    const checkbox = event.target as HTMLInputElement;
-    settings.midi_enabled = checkbox.checked;
-    console.log("MIDI input enabled changed to:", checkbox.checked);
-    if (checkbox.checked) {
-      if (window.WebMidi) {
-        window.WebMidi
-          .enable()
-          .then(onEnabled)
-          .catch((err: Error) => {
-            console.error("WebMidi enable error:", err);
-            alert(err);
-          });
-      }
-    } else {
-      // Disable MIDI
-      if (window.WebMidi && window.WebMidi.enabled) {
-        console.log("Disabling WebMidi");
-        window.WebMidi.disable();
-      }
-    }
-  });
-  
-  // Initialize keyboard immediately if URL has parameters, otherwise show settings
-  if (window.location.search) {
-    const keyboard = document.getElementById("keyboard");
-    const landingPage = document.getElementById("landing-page");
-    const settingsButton = document.getElementById("settings-button");
+  // Initialize settings manager with presets
+  settingsManager.loadPresets().then(() => {
+    // Initialize scroll area
+    initScrollArea();
     
-    if (keyboard) keyboard.style.display = "block";
-    if (landingPage) landingPage.style.display = "none";
-    if (settingsButton) settingsButton.style.display = "block";
+    // Initialize audio context immediately
+    const ctx = initAudio();
+    if (ctx) {
+      settings.audioContext = ctx;
+      console.log("[DEBUG] Audio context initialized on load:", ctx.state);
+    }
     
-    const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-    if (instrumentSelect) {
-      instrumentSelect.value = getData.instrument ?? "organ";
-    }
-    setTimeout(() => { goKeyboard(); }, 1500);
-  } else {
-    showSettings();
-  }
-
-  // Initialize note configuration
-  initNoteConfig();
-
-  // Add pitch type change handler
-  document.getElementById('pitch-type')?.addEventListener('change', () => {
-    handlePitchTypeChange();
-    // Update central octave after pitch type change
-    handleCentralOctaveChange();
-  });
-
-  // Add central octave change handler
-  document.getElementById('central-octave')?.addEventListener('input', handleCentralOctaveChange);
-
-  // Initialize color vision mode and add listeners
-  const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
-  if (colorVisionSelect) {
-    colorVisionSelect.value = settings.colorVisionMode;
-    colorVisionSelect.addEventListener('change', () => {
-      updateColorVisionMode();
-      updatePreviewButtons();
-    });
-  }
-
-  // Add color saturation slider listener
-  const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
-  if (saturationSlider) {
-    saturationSlider.addEventListener('input', () => {
-      updateColorSaturation();
-      updatePreviewButtons();
-    });
-  }
-
-  // Add invert up/down checkbox listener
-  const invertUpdownCheckbox = document.getElementById('invert-updown') as HTMLInputElement;
-  if (invertUpdownCheckbox) {
-    invertUpdownCheckbox.addEventListener('change', () => {
-      settings.invert_updown = invertUpdownCheckbox.checked;
-      updatePreviewButtons();
-      updateKeyboardDisplay();
-    });
-  }
-}, false);
-
-// Add interface for preset structure
-interface Preset {
-  label: string;
-  parameters: {
-    fundamental: string;
-    right: string;
-    upright: string;
-    size: string;
-    rotation: string;
-    instrument: string;
-    enum: string;
-    equivSteps: string;
-    piano_colors: string;
-    spectrum_colors: string;
-    no_labels: string;
-    scale: string[];
-    names: string[];
-    note_colors: string[];
-  };
-}
-
-interface PresetGroups {
-  [key: string]: Preset[];
-}
-
-let presets: PresetGroups = {};
-
-// Load presets from JSON file
-async function loadPresets(): Promise<void> {
-  try {
-    const response = await fetch('presets.json');
-    presets = await response.json();
-    populatePresetDropdown();
-  } catch (error) {
-    console.error('Error loading presets:', error);
-  }
-}
-
-// Populate the quicklinks dropdown with presets from JSON
-function populatePresetDropdown(): void {
-  const quicklinks = document.getElementById('quicklinks') as HTMLSelectElement;
-  if (!quicklinks) return;
-
-  // Clear existing options except the first "Choose Preset" option
-  while (quicklinks.options.length > 1) {
-    quicklinks.remove(1);
-  }
-
-  // Add presets from JSON
-  Object.entries(presets).forEach(([groupName, groupPresets]) => {
-    const optgroup = document.createElement('optgroup');
-    optgroup.label = groupName;
-
-    groupPresets.forEach(preset => {
-      const option = document.createElement('option');
-      option.text = preset.label;
-      option.value = JSON.stringify(preset.parameters);
-      optgroup.appendChild(option);
-    });
-
-    quicklinks.appendChild(optgroup);
-  });
-
-  // Add change handler to update form values without immediate navigation
-  quicklinks.addEventListener('change', (event) => {
-    const select = event.target as HTMLSelectElement;
-    if (select.selectedIndex > 0) { // If not "Choose Preset"
-      try {
-        const parameters = JSON.parse(select.value);
-        
-        // Update all form fields with preset values
-        Object.entries(parameters).forEach(([key, value]) => {
-          const element = document.getElementById(key) as HTMLInputElement;
-          if (element) {
-            if (element.type === 'checkbox') {
-              element.checked = value === 'true';
-            } else if (Array.isArray(value)) {
-              element.value = value.join('\n');
-            } else {
-              element.value = value as string;
-            }
-          }
-        });
-
-        // Update note configuration
-        updateNoteConfigFromPreset(parameters);
-
-        // Update URL without navigation
-        changeURL();
-        
-        // Trigger UI updates
-        hideRevealNames();
-        hideRevealColors();
-        hideRevealEnum();
-      } catch (error) {
-        console.error('Error applying preset:', error);
+    // Add settings button handler
+    document.getElementById('settings-button')?.addEventListener('click', showSettings);
+    
+    // Add click handler to close modal when clicking overlay
+    document.querySelector('.modal-overlay')?.addEventListener('click', (event) => {
+      if (event.target === event.currentTarget) {
+        hideSettings();
       }
-    }
-  });
-
-  // Check current URL to set initial selection
-  checkPreset(16);
-}
-
-// Add function to update note configuration from preset or URL parameters
-function updateNoteConfigFromPreset(parameters: QueryDataInterface): void {
-  const namesElement = document.getElementById('names') as HTMLTextAreaElement;
-  const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-  const rStepsElement = document.getElementById('rSteps') as HTMLInputElement;
-  const urStepsElement = document.getElementById('urSteps') as HTMLInputElement;
-
-  // Update note names if provided
-  if (parameters.names && Array.isArray(parameters.names)) {
-    namesElement.value = parameters.names.join('\n');
-  }
-
-  // Update note colors if provided
-  if (parameters.note_colors && Array.isArray(parameters.note_colors)) {
-    noteColorsElement.value = parameters.note_colors.join('\n');
-  }
-
-  // Update rSteps and urSteps if provided
-  if (parameters.right) {
-    rStepsElement.value = String(parameters.right);
-    settings.rSteps = parseInt(String(parameters.right));
-  }
-  if (parameters.upright) {
-    urStepsElement.value = String(parameters.upright);
-    settings.urSteps = parseInt(String(parameters.upright));
-  }
-
-  // Trigger URL update and redraw if steps were changed
-  if (parameters.right || parameters.upright) {
-    changeURL();
-    resizeHandler(); // This will trigger a redraw with new steps
-  }
-
-  // Reinitialize note configuration UI
-  initNoteConfig();
-}
-
-// Modify the checkPreset function to trigger the Lumatone preset selection
-function checkPreset(_init: number): void {
-  const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
-  if (!mselect) return;
-
-  // Find and select the Lumatone preset
-  for (let i = 0; i < mselect.options.length; i++) {
-    if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
-      mselect.selectedIndex = i;
-      // Trigger the change event to apply the preset
-      mselect.dispatchEvent(new Event('change'));
-      
-      // Initialize audio context and load samples
-      const ctx = initAudio();
-      if (ctx) {
-        settings.audioContext = ctx;
-        console.log("[DEBUG] Audio context initialized after preset:", ctx.state);
-        
-        // Load the instrument samples
-        loadInstrumentSamples();
-      }
-      return;
-    }
-  }
-
-  // If no preset found, continue with URL parameter handling
-  if (window.location.search) {
-    const params = new QueryData(window.location.search, true);
-    updateNoteConfigFromPreset(params);
-  }
-}
-
-export function drawGrid(): void {
-  if (!settings.centerpoint || !settings.hexSize) return;
-
-  // Calculate visible area bounds with generous padding
-  const padding = 20; // More hexes beyond visible area
-  const width = window.innerWidth;
-  const height = window.innerHeight - 50;
-  
-  // Calculate how many hexes fit in view (plus padding)
-  const hexesAcrossHalf = Math.ceil((width / settings.hexWidth)) + padding;
-  const hexesVerticalHalf = Math.ceil((height / settings.hexVert)) + padding;
-  
-  // Calculate grid bounds relative to centerpoint
-  const viewCenterX = settings.centerpoint.x;
-  const viewCenterY = settings.centerpoint.y;
-  
-  // Calculate hex coordinates range with offset based on view center
-  const centerOffsetX = Math.floor(viewCenterX / settings.hexWidth);
-  const centerOffsetY = Math.floor(viewCenterY / settings.hexVert);
-  
-  const minR = -hexesAcrossHalf + centerOffsetX;
-  const maxR = hexesAcrossHalf + centerOffsetX;
-  const minUR = -hexesVerticalHalf + centerOffsetY;
-  const maxUR = hexesVerticalHalf + centerOffsetY;
-  
-  // Draw the grid
-  for (let r = minR; r <= maxR; r++) {
-    for (let ur = minUR; ur <= maxUR; ur++) {
-      const coords = new Point(r, ur);
-      const centsObj = hexCoordsToCents(coords);
-      drawHex(coords, centsToColor(centsObj, false));
-    }
-  }
-}
-
-// Add noPreset function
-function noPreset(): void {
-  const quicklinks = document.getElementById('quicklinks') as HTMLSelectElement;
-  if (quicklinks) {
-    quicklinks.selectedIndex = 0;
-  }
-}
-
-function initInstrumentSample(instrumentName: string, index: number): void {
-  console.log(`[DEBUG] initInstrumentSample called with instrument: ${instrumentName}, index: ${index}`);
-  loadSample(instrumentName, index);
-}
-
-// Move sample loading to a separate function
-function loadInstrumentSamples(): void {
-  const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-  const instrumentOption = instrumentSelect ? instrumentSelect.selectedIndex : 0;
-  console.log("[DEBUG] Selected instrument index:", instrumentOption);
-
-  if (instrumentSelect && instrumentSelect.querySelector(':checked')?.parentElement instanceof HTMLOptGroupElement) {
-    const parentElement = instrumentSelect.querySelector(':checked')?.parentElement as HTMLOptGroupElement;
-    if (parentElement.label === 'MIDI out') {
-      const selectedOption = instrumentSelect.querySelector(':checked');
-      if (selectedOption?.textContent) {
-        myOutput = window.WebMidi.getOutputByName(selectedOption.textContent);
-        console.log("[DEBUG] MIDI output selected:", myOutput);
-        if (myOutput) {
-          myOutput.sendAllSoundOff();
+    });
+    
+    // Add MIDI input checkbox handler
+    document.getElementById('midi_input')?.addEventListener('change', (event) => {
+      const checkbox = event.target as HTMLInputElement;
+      settings.midi_enabled = checkbox.checked;
+      console.log("MIDI input enabled changed to:", checkbox.checked);
+      if (checkbox.checked) {
+        if (window.WebMidi) {
+          window.WebMidi
+            .enable()
+            .then(onEnabled)
+            .catch((err: Error) => {
+              console.error("WebMidi enable error:", err);
+              alert(err);
+            });
+        }
+      } else {
+        // Disable MIDI
+        if (window.WebMidi && window.WebMidi.enabled) {
+          console.log("Disabling WebMidi");
+          window.WebMidi.disable();
         }
       }
-      return;
+    });
+    
+    // Initialize keyboard immediately if URL has parameters, otherwise show settings
+    if (window.location.search) {
+      const keyboard = document.getElementById("keyboard");
+      const landingPage = document.getElementById("landing-page");
+      const settingsButton = document.getElementById("settings-button");
+      
+      if (keyboard) keyboard.style.display = "block";
+      if (landingPage) landingPage.style.display = "none";
+      if (settingsButton) settingsButton.style.display = "block";
+      
+      const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
+      if (instrumentSelect) {
+        instrumentSelect.value = getData.instrument ?? "organ";
+      }
+      setTimeout(() => { goKeyboard(); }, 1500);
+    } else {
+      showSettings();
     }
-  }
 
-  myOutput = null;
-  let instrumentToLoad = instruments[instrumentOption];
-  if (!instrumentToLoad) {
-    console.error("[DEBUG] No instrument selected, defaulting to piano");
-    instrumentToLoad = instruments[0]; // Default to piano
-  }
-  console.log("[DEBUG] Selected instrument:", {
-    index: instrumentOption,
-    name: instrumentToLoad.fileName,
-    fade: instrumentToLoad.fade,
-    audioContextState: settings.audioContext?.state
+    // Initialize note configuration
+    settingsManager.initNoteConfig();
+
+    // Add pitch type change handler
+    document.getElementById('pitch-type')?.addEventListener('change', () => {
+      settingsManager.handlePitchTypeChange();
+      // Update central octave after pitch type change
+      settingsManager.handleCentralOctaveChange();
+      settings = settingsManager.getSettings();
+    });
+
+    // Add central octave change handler
+    document.getElementById('central-octave')?.addEventListener('input', () => {
+      settingsManager.handleCentralOctaveChange();
+      settings = settingsManager.getSettings();
+    });
+
+    // Initialize color vision mode and add listeners
+    const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
+    if (colorVisionSelect) {
+      colorVisionSelect.value = settings.colorVisionMode;
+      colorVisionSelect.addEventListener('change', () => {
+        settingsManager.updateColorVisionMode();
+        settingsManager.updatePreviewButtons();
+        settings = settingsManager.getSettings();
+      });
+    }
+
+    // Add color saturation slider listener
+    const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
+    if (saturationSlider) {
+      saturationSlider.addEventListener('input', () => {
+        settingsManager.updateColorSaturation();
+        settingsManager.updatePreviewButtons();
+        settings = settingsManager.getSettings();
+      });
+    }
+
+    // Add invert up/down checkbox listener
+    const invertUpdownCheckbox = document.getElementById('invert-updown') as HTMLInputElement;
+    if (invertUpdownCheckbox) {
+      invertUpdownCheckbox.addEventListener('change', () => {
+        settings.invert_updown = invertUpdownCheckbox.checked;
+        settingsManager.updatePreviewButtons();
+        settingsManager.updateKeyboardDisplay();
+        settings = settingsManager.getSettings();
+      });
+    }
   });
-  
-  // Add sampleBuffer to settings
-  settings.sampleBuffer = [undefined, undefined, undefined, undefined];
-  
-  // Load the samples
-  try {
-    console.log("[DEBUG] About to load samples:", {
-      instrument: instrumentToLoad.fileName,
-      fade: instrumentToLoad.fade,
-      audioContext: settings.audioContext?.state,
-      sampleBuffer: settings.sampleBuffer
-    });
-    initInstrumentSample(instrumentToLoad.fileName, 0);
-    setSampleFadeout(instrumentToLoad.fade);
-  } catch (error) {
-    console.error("[DEBUG] Error loading samples:", error);
-    // Try loading piano as fallback
-    console.log("[DEBUG] Attempting to load piano as fallback...");
-    initInstrumentSample("piano", 0);
-    setSampleFadeout(0.1);
-  }
-}
-
-function initNoteConfig(): void {
-  const noteConfig = document.getElementById('note-config');
-  if (!noteConfig) return;
-
-  // Find or create note-buttons container
-  let noteButtons = noteConfig.querySelector('.note-buttons');
-  if (!noteButtons) {
-    noteButtons = document.createElement('div');
-    noteButtons.className = 'note-buttons';
-    noteConfig.appendChild(noteButtons);
-  } else {
-    // Clear existing buttons
-    noteButtons.innerHTML = '';
-  }
-
-  // Get current note names and colors
-  const names = (document.getElementById('names') as HTMLTextAreaElement)?.value.split('\n') || [];
-  const colors = (document.getElementById('note_colors') as HTMLTextAreaElement)?.value.split('\n') || [];
-
-  // Create preview buttons for each note
-  names.forEach((name, index) => {
-    const button = document.createElement('button');
-    button.className = 'note-button';
-    button.style.backgroundColor = `#${colors[index] || 'ffffff'}`;
-    button.textContent = name;
-    button.disabled = true; // Make buttons non-interactive
-    noteButtons.appendChild(button);
-  });
-
-  // Add live update handlers to textareas
-  const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
-  const colorsTextarea = document.getElementById('note_colors') as HTMLTextAreaElement;
-
-  if (namesTextarea && colorsTextarea) {
-    // Show the textareas
-    namesTextarea.style.display = 'block';
-    colorsTextarea.style.display = 'block';
-
-    // Add scroll synchronization
-    namesTextarea.addEventListener('scroll', () => {
-      colorsTextarea.scrollTop = namesTextarea.scrollTop;
-    });
-
-    colorsTextarea.addEventListener('scroll', () => {
-      namesTextarea.scrollTop = colorsTextarea.scrollTop;
-    });
-
-    // Add input handlers for live updates
-    namesTextarea.addEventListener('input', () => {
-      synchronizeTextareas();
-      updatePreviewButtons();
-      updateKeyboardDisplay();
-      changeURL();
-    });
-
-    colorsTextarea.addEventListener('input', () => {
-      synchronizeTextareas();
-      updatePreviewButtons();
-      updateKeyboardDisplay();
-      changeURL();
-    });
-  }
-}
-
-// Function to keep textareas synchronized in length
-function synchronizeTextareas(): void {
-  const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
-  const colorsTextarea = document.getElementById('note_colors') as HTMLTextAreaElement;
-
-  if (!namesTextarea || !colorsTextarea) return;
-
-  const names = namesTextarea.value.split('\n');
-  const colors = colorsTextarea.value.split('\n');
-
-  // Ensure both arrays have the same length
-  const maxLength = Math.max(names.length, colors.length);
-  while (names.length < maxLength) names.push('');
-  while (colors.length < maxLength) colors.push('ffffff');
-
-  // Update textareas
-  namesTextarea.value = names.join('\n');
-  colorsTextarea.value = colors.join('\n');
-}
-
-function handlePitchTypeChange(): void {
-  const pitchType = (document.getElementById('pitch-type') as HTMLSelectElement)?.value;
-  const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
-
-  if (!fundamentalInput) return;
-
-  const currentValue = parseFloat(fundamentalInput.value);
-  
-  if (pitchType === 'A4') {
-    // Convert from C4 to A4 (A4 is 9 semitones above C4)
-    fundamentalInput.value = (currentValue * Math.pow(2, 9/12)).toFixed(5);
-  } else {
-    // Convert from A4 to C4 (C4 is 9 semitones below A4)
-    fundamentalInput.value = (currentValue * Math.pow(2, -9/12)).toFixed(5);
-  }
-
-  // Update settings and redraw
-  settings.fundamental = parseFloat(fundamentalInput.value);
-  drawGrid();
-  changeURL();
-}
-
-function handleCentralOctaveChange(): void {
-  const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
-  if (!octaveSlider) return;
-
-  // Store the octave value in settings for use in drawing
-  settings.octaveOffset = parseInt(octaveSlider.value);
-
-  // Redraw the grid with the new octave numbers
-  if (settings.canvas && settings.context) {
-    settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
-    drawGrid();
-  }
-  
-  // Update URL to persist the change
-  changeURL();
-}
+}, false);
 
 // Add scroll area functionality with edge detection
 function initScrollArea(): void {
-  const scrollArea = document.querySelector('.scroll-area') as HTMLElement;
-  console.log('Initializing scroll area:', scrollArea);
-  if (!scrollArea) return;
-
-  let isDragging = false;
-  let startX = 0;
-  let lastX = 0;
-  let isRedrawing = false;
-
-  scrollArea.addEventListener('mousedown', (e: Event) => {
-    console.log('Scroll area mousedown');
-    const mouseEvent = e as MouseEvent;
-    isDragging = true;
-    startX = mouseEvent.pageX;
-    lastX = startX;
-    mouseEvent.preventDefault();
-  });
-
-  scrollArea.addEventListener('touchstart', (e: Event) => {
-    console.log('Scroll area touchstart');
-    const touchEvent = e as TouchEvent;
-    isDragging = true;
-    startX = touchEvent.touches[0].pageX;
-    lastX = startX;
-    touchEvent.preventDefault();
-  });
-
-  function updateView(delta: number): void {
-    if (isRedrawing) return;
-    
-    if (settings.centerpoint) {
-      // Transform the screen-space horizontal movement to grid-space
-      const angle = settings.rotation;
-      const gridDeltaX = delta * Math.cos(angle);
-      const gridDeltaY = -delta * Math.sin(angle);  // Negative to counter the rotation
-      
-      // Update both coordinates to maintain horizontal screen movement
-      settings.centerpoint.x += gridDeltaX;
-      settings.centerpoint.y += gridDeltaY;
-      
-      // Trigger redraw
-      isRedrawing = true;
-      requestAnimationFrame(() => {
-        drawGrid();
-        isRedrawing = false;
-      });
-    }
+  // Clean up existing scroll manager if it exists
+  if (scrollManager) {
+    scrollManager.cleanup();
   }
-
-  document.addEventListener('mousemove', (e: Event) => {
-    if (!isDragging) return;
-    const mouseEvent = e as MouseEvent;
-    const currentX = mouseEvent.pageX;
-    const delta = currentX - lastX;
-    lastX = currentX;
-    
-    updateView(delta);
-    mouseEvent.preventDefault();
-  });
-
-  document.addEventListener('touchmove', (e: Event) => {
-    if (!isDragging) return;
-    const touchEvent = e as TouchEvent;
-    const currentX = touchEvent.touches[0].pageX;
-    const delta = currentX - lastX;
-    lastX = currentX;
-    
-    updateView(delta);
-    touchEvent.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('mouseup', () => {
-    isDragging = false;
-  });
-
-  document.addEventListener('touchend', () => {
-    isDragging = false;
-  });
-
-  document.addEventListener('mouseleave', () => {
-    isDragging = false;
-  });
-
-  // Prevent browser back/forward gestures
-  window.addEventListener('wheel', (e: WheelEvent) => {
-    if (e.deltaX !== 0) {
-      e.preventDefault();
-      updateView(-e.deltaX);
-    }
-  }, { passive: false });
-
-  // Prevent two-finger swipe gestures
-  window.addEventListener('gesturestart', (e: Event) => {
-    e.preventDefault();
-  }, { passive: false });
-
-  window.addEventListener('gesturechange', (e: Event) => {
-    e.preventDefault();
-  }, { passive: false });
+  
+  // Create new scroll manager instance
+  scrollManager = new ScrollManager(settings);
 }

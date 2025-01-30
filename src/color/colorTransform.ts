@@ -1,5 +1,5 @@
 // Color transformation utilities for colorblind modes
-export type ColorVisionType = 'normal' | 'protanopia' | 'deuteranopia' | 'tritanopia';
+export type ColorVisionType = 'normal' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'achromatopsia';
 
 // Color transformation matrices for different types of CVD
 const CVD_MATRICES = {
@@ -17,6 +17,11 @@ const CVD_MATRICES = {
     [0.95, 0.05, 0],
     [0, 0.433, 0.567],
     [0, 0.475, 0.525]
+  ],
+  achromatopsia: [
+    [0.299, 0.587, 0.114],
+    [0.299, 0.587, 0.114],
+    [0.299, 0.587, 0.114]
   ]
 };
 

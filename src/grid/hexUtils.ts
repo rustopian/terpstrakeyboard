@@ -1,27 +1,10 @@
 // Hex grid utility functions for the Terpstra Keyboard WebApp
-import { Point } from './geometry.ts';
-import { applyMatrixToPoint } from './geometry.ts';
-import { roundTowardZero } from './geometry.ts';
+import { Point } from '../core/geometry';
+import { applyMatrixToPoint } from '../core/geometry';
+import { roundTowardZero } from '../core/geometry';
+import { CentsResult, Settings } from '../core/types';
 
 // Type definitions
-interface Settings {
-  centerpoint: Point;
-  hexWidth: number;
-  hexVert: number;
-  rSteps: number;
-  urSteps: number;
-  scale: number[];
-  equivInterval: number;
-  rotationMatrix: [number, number, number, number, number, number];
-  hexSize: number;
-  octaveOffset: number;
-}
-
-interface CentsResult {
-  cents: number;
-  reducedSteps: number;
-}
-
 interface HexVerticesResult {
   x: number[];
   y: number[];

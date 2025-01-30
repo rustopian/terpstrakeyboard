@@ -1,8 +1,8 @@
 // Event handling functions for the Terpstra Keyboard WebApp
-import { hexCoordsToCents, getHexCoordsAt } from './hexUtils';
-import { Point } from './geometry';
-import { centsToColor, drawHex } from './displayUtils';
-import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote } from './activeHex';
+import { hexCoordsToCents, getHexCoordsAt } from '../grid/hexUtils';
+import { Point } from '../core/geometry';
+import { centsToColor, drawHex } from '../grid/displayUtils';
+import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote } from '../audio/activeHex';
 
 interface Settings {
   canvas: HTMLCanvasElement;

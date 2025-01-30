@@ -1,4 +1,4 @@
-import { SETTINGS_53_EDO } from './tuningTypes';
+import { SETTINGS_53_EDO } from '../settings/tuningTypes';
 
 // Display currently played notes
 export function updateChordDisplay(notes: number[]): void {
