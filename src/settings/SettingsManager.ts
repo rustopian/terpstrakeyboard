@@ -1,4 +1,3 @@
-
 import { Point } from '../core/geometry';
 import { calculateRotationMatrix } from '../core/geometry';
 import { transformColorsForCVD, transformColorForCVD, ColorVisionType } from '../color/colorTransform';
@@ -521,29 +520,65 @@ export class SettingsManager {
     }
 
     // Update note configuration from preset parameters
-    private updateNoteConfigFromPreset(parameters: any): void {
-        const namesElement = document.getElementById('names') as HTMLTextAreaElement;
-        const noteColorsElement = document.getElementById('note_colors') as HTMLTextAreaElement;
-        const rStepsElement = document.getElementById('rSteps') as HTMLInputElement;
-        const urStepsElement = document.getElementById('urSteps') as HTMLInputElement;
+    public updateNoteConfigFromPreset(parameters: any): void {
+        // Update all form inputs based on parameters
+        const formInputs = {
+            'fundamental': parameters.fundamental,
+            'rSteps': parameters.right,
+            'urSteps': parameters.upright,
+            'hexSize': parameters.size,
+            'rotation': parameters.rotation,
+            'instrument': parameters.instrument,
+            'enum': parameters.enum,
+            'equivSteps': parameters.equivSteps,
+            'spectrum_colors': parameters.spectrum_colors,
+            'fundamental_color': parameters.fundamental_color,
+            'no_labels': parameters.no_labels,
+            'midi_input': parameters.midi_input,
+            'invert-updown': parameters.invert_updown,
+            'show_intervals': parameters.show_intervals,
+            'show_all_notes': parameters.show_all_notes
+        };
 
-        // Update note names if provided
-        if (parameters.names && Array.isArray(parameters.names)) {
-            namesElement.value = parameters.names.join('\n');
-        }
+        // Update each form input if parameter exists
+        Object.entries(formInputs).forEach(([id, value]) => {
+            if (value !== undefined) {
+                const element = document.getElementById(id) as HTMLInputElement;
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value === 'true';
+                    } else {
+                        element.value = value;
+                    }
+                }
+            }
+        });
 
-        // Update note colors if provided
-        if (parameters.note_colors && Array.isArray(parameters.note_colors)) {
-            noteColorsElement.value = parameters.note_colors.join('\n');
-        }
+        // Handle multiline text areas
+        const textAreas = {
+            'scale': parameters.scale,
+            'names': parameters.names,
+            'note_colors': parameters.note_colors
+        };
 
-        // Update rSteps and urSteps if provided
+        Object.entries(textAreas).forEach(([id, value]) => {
+            if (value) {
+                const element = document.getElementById(id) as HTMLTextAreaElement;
+                if (element) {
+                    if (Array.isArray(value)) {
+                        element.value = value.join('\n');
+                    } else {
+                        element.value = value;
+                    }
+                }
+            }
+        });
+
+        // Update settings object with new values
         if (parameters.right) {
-            rStepsElement.value = String(parameters.right);
             this.settings.rSteps = parseInt(String(parameters.right));
         }
         if (parameters.upright) {
-            urStepsElement.value = String(parameters.upright);
             this.settings.urSteps = parseInt(String(parameters.upright));
         }
 
@@ -553,6 +588,18 @@ export class SettingsManager {
 
     // Check preset selection
     public checkPreset(_init: number): void {
+        // First check for URL parameters
+        if (window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            const paramObj: any = {};
+            params.forEach((value, key) => {
+                paramObj[key] = value;
+            });
+            this.updateNoteConfigFromPreset(paramObj);
+            return; // Don't apply preset if we have URL parameters
+        }
+
+        // Only apply preset if no URL parameters exist
         const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
         if (!mselect) return;
 
@@ -564,16 +611,6 @@ export class SettingsManager {
                 mselect.dispatchEvent(new Event('change'));
                 return;
             }
-        }
-
-        // If no preset found, continue with URL parameter handling
-        if (window.location.search) {
-            const params = new URLSearchParams(window.location.search);
-            const paramObj: any = {};
-            params.forEach((value, key) => {
-                paramObj[key] = value;
-            });
-            this.updateNoteConfigFromPreset(paramObj);
         }
     }
 
