@@ -108,11 +108,15 @@
 								<input id="midi_input" type="checkbox" name="midi_input" value="fnord" onchange="changeURL();noPreset();">
 								<span class="label-body">Control MIDI devices (WebMIDI Output)</span>
 							</label>
+							<label>
+								<input id="toggle_mode" type="checkbox" name="toggle_mode" value="fnord" onchange="changeURL();noPreset();">
+								<span class="label-body">Toggle Mode (Click/tap to hold notes)</span>
+							</label>
 						</div>
 					</div>
 				</div>
 
-				<!-- Layout & Display Tab -->
+				<!-- Layout Tab -->
 				<div id="layout" class="tab-content">
 					<div class="row">
 						<div class="one-half column">
@@ -150,6 +154,13 @@
 						<div class="one-half column">
 							<div class="display-controls">
 								<label>Display Settings</label>
+								<div class="control-group">
+									<label>
+										<input id="symbolic-chord-notation" type="checkbox" name="symbolic_chord_notation" value="fnord" onchange="changeURL();noPreset();">
+										<span class="label-body">Show Full Chord Names</span>
+									</label>
+								</div>
+
 								<div class="control-group">
 									<label>
 										<input id="enum" type="checkbox" name="number_or_name" value="fnord" onchange="hideRevealNames();noPreset();">
@@ -250,6 +261,19 @@ ff5555
 							</div>
 						</div>
 					</div>
+					<div class="row">
+						<div class="six columns">
+							<label for="key-image">Key Image</label>
+							<select class="u-full-width" id="key-image" onchange="updateKeyboardDisplay()">
+								<option value="none">None</option>
+								<option value="hexagon">Hexagon</option>
+							</select>
+						</div>
+						<div class="six columns">
+							<label for="text-size">Note Text Size</label>
+							<input type="range" id="text-size" min="0.5" max="1.0" step="0.1" value="1.0" onchange="updateKeyboardDisplay()">
+						</div>
+					</div>
 				</div>
 
 				<!-- Advanced Tab -->
@@ -326,6 +350,7 @@ Terpstra Keyboard WebApp | 31-ed2 Bosanquet / Wilson / Terpstra
 
 	<img alt="Return to keyboard design" src="images/back.png" id="backButton" onclick="back()" style="display: none;">
 
+	<button id="release-all" class="release-all-button">Release All</button>
 	<button id="settings-button" class="settings-button">Settings</button>
 
 	<div id="chord-display" class="chord-display"></div>

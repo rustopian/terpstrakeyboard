@@ -47,6 +47,12 @@ export interface Settings {
   maxR: number;
   minUR: number;
   maxUR: number;
+  useKeyImage: boolean;
+  keyImage: string;
+  textSize: number;
+  useSymbolicChordNotation?: boolean;
+  midi_input: boolean;
+  toggle_mode: boolean;
 }
 
 // Default settings
@@ -95,4 +101,10 @@ export const defaultSettings: Settings = {
   maxR: 0,
   minUR: 0,
   maxUR: 0,
+  useKeyImage: false,
+  keyImage: '',
+  textSize: 1.0,
+  useSymbolicChordNotation: false,
+  midi_input: false,
+  toggle_mode: false
 }; 

@@ -2,8 +2,8 @@
 import { Point } from '../core/geometry';
 import { applyMatrixToPoint } from '../core/geometry';
 import { roundTowardZero } from '../core/geometry';
-import { CentsResult, Settings } from '../core/types';
-
+import { CentsResult } from '../core/types';
+import { Settings } from '../settings/Settings';
 // Type definitions
 interface HexVerticesResult {
   x: number[];

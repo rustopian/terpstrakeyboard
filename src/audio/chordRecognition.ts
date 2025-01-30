@@ -1,4 +1,4 @@
-import { SETTINGS_53_EDO } from '../settings/tuningTypes';
+import { SETTINGS_53_EDO, SETTINGS_31_EDO } from '../settings/tuningTypes';
 
 // Display currently played notes
 export function updateChordDisplay(notes: number[]): void {
@@ -13,10 +13,15 @@ export function updateChordDisplay(notes: number[]): void {
   const settings = (window as any).settings;
   const equivSteps = settings.enum ? settings.equivSteps : settings.scale.length;
   
+  // Determine which tuning system to use based on settings
+  const is31EDO = equivSteps === 31;
+  const tuningSystem = is31EDO ? SETTINGS_31_EDO : SETTINGS_53_EDO;
+  const totalSteps = is31EDO ? 31 : 53;
+  const noteOffset = is31EDO ? 2 : -7;  // +2 for 31-EDO, -7 for 53-EDO
+  
   // Get note names using the same logic as hex labels
   const noteNames = notes.map(note => {
-    // Subtract 7 steps from each note
-    const adjustedNote = note - 7;
+    const adjustedNote = note + noteOffset;  // Use the correct offset
     let reducedNote = adjustedNote % equivSteps;
     if (reducedNote < 0) {
       reducedNote = equivSteps + reducedNote;
@@ -26,8 +31,8 @@ export function updateChordDisplay(notes: number[]): void {
 
   // Show intervals for 2 notes if the setting is enabled
   if (notes.length === 2 && settings.showIntervals) {
-    const interval = Math.abs((notes[1] - notes[0] + 53) % 53);
-    const intervalData = SETTINGS_53_EDO.INTERVAL_DICT[interval];
+    const interval = Math.abs((notes[1] - notes[0] + totalSteps) % totalSteps);
+    const intervalData = tuningSystem.INTERVAL_DICT[interval];
     if (intervalData && intervalData.length > 0) {
       display.textContent = `${noteNames.join(' ')} (${intervalData[0].intervalName})`;
       display.style.display = 'block';
@@ -37,9 +42,17 @@ export function updateChordDisplay(notes: number[]): void {
 
   // Try to recognize chord if we have multiple notes
   if (notes.length >= 2) {
-    const chordResult = recognizeChord(notes.map(n => n - 7));
+    const chordResult = recognizeChord(notes.map(n => n + noteOffset), tuningSystem, totalSteps);
     if (chordResult) {
-      let displayText = `${chordResult.root} ${chordResult.quality}`;
+      let displayText;
+      if (settings.useSymbolicChordNotation) {
+        // Show full name when checkbox is checked
+        displayText = `${chordResult.root}${chordResult.quality} (${chordResult.root} ${chordResult.fullName})`;
+      } else {
+        // Show just the symbol when checkbox is unchecked
+        displayText = chordResult.symbol;
+      }
+      
       if (chordResult.inversion > 0) {
         displayText += ` (${chordResult.inversion}${getOrdinalSuffix(chordResult.inversion)} inv)`;
       }
@@ -64,12 +77,14 @@ export function updateChordDisplay(notes: number[]): void {
 interface ChordResult {
   root: string;
   quality: string;
+  fullName: string;  // Added this field for the full quality name
   inversion: number;
   additionalIntervals?: string[];
+  symbol: string;
 }
 
 // Convert a note name (like 'Eb4' or '↓↓G4') to its step number using NATURAL_NOTE_STEPS and MODIFIER_STEPS
-function noteNameToSteps(noteName: string): number {
+function noteNameToSteps(noteName: string, tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): number {
   // Remove octave number
   const baseNoteName = noteName.replace(/\d+$/, '');
   
@@ -87,7 +102,7 @@ function noteNameToSteps(noteName: string): number {
   const suffix = baseNoteName.slice(baseNoteIndex + 1); // e.g., '♭'
   
   // Get the base note value
-  const baseValue = SETTINGS_53_EDO.NATURAL_NOTE_STEPS[baseNote];
+  const baseValue = tuningSystem.NATURAL_NOTE_STEPS[baseNote];
   if (baseValue === undefined) {
     console.warn('Unknown base note:', baseNote, 'in', noteName);
     return 0;
@@ -98,7 +113,7 @@ function noteNameToSteps(noteName: string): number {
   
   // Handle prefix modifiers (↑, ↓, ↑↑, ↓↓)
   if (prefix) {
-    const prefixValue = SETTINGS_53_EDO.MODIFIER_STEPS[prefix];
+    const prefixValue = tuningSystem.MODIFIER_STEPS[prefix];
     if (prefixValue !== undefined) {
       modifierValue += prefixValue;
     }
@@ -106,7 +121,7 @@ function noteNameToSteps(noteName: string): number {
   
   // Handle suffix modifiers (♭, ♯, b, #)
   if (suffix) {
-    const suffixValue = SETTINGS_53_EDO.MODIFIER_STEPS[suffix];
+    const suffixValue = tuningSystem.MODIFIER_STEPS[suffix];
     if (suffixValue !== undefined) {
       modifierValue += suffixValue;
     }
@@ -116,23 +131,23 @@ function noteNameToSteps(noteName: string): number {
 }
 
 // Convert a chord spelling to its interval pattern
-function getChordPattern(spelling: string[]): number[] {
-  const steps = spelling.map(noteNameToSteps);
+function getChordPattern(spelling: string[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): number[] {
+  const steps = spelling.map(note => noteNameToSteps(note, tuningSystem));
   const root = steps[0];
   return steps.slice(1).map(step => {
     let interval = step - root;
-    if (interval < 0) interval += 53;
+    if (interval < 0) interval += (tuningSystem === SETTINGS_31_EDO ? 31 : 53);
     return interval;
   });
 }
 
-function getIntervalName(interval: number): string | null {
-  const intervalData = SETTINGS_53_EDO.INTERVAL_DICT[interval];
+function getIntervalName(interval: number, tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): string | null {
+  const intervalData = tuningSystem.INTERVAL_DICT[interval];
   if (!intervalData || intervalData.length === 0) return null;
   return intervalData[0].intervalName;
 }
 
-function recognizeChord(notes: number[]): ChordResult | null {
+function recognizeChord(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO, totalSteps: number): ChordResult | null {
   if (notes.length < 2) return null;
 
   // Sort by actual pitch and get the lowest 3-4 notes
@@ -140,21 +155,21 @@ function recognizeChord(notes: number[]): ChordResult | null {
   const baseNotes = sortedNotes.slice(0, Math.min(4, notes.length));
   
   // Try with base notes first
-  let result = findChordInNotes(baseNotes);
+  let result = findChordInNotes(baseNotes, tuningSystem, totalSteps);
   
   // If no result with base notes and we have more notes, try with all notes
   if (!result && baseNotes.length < notes.length) {
-    result = findChordInNotes(notes);
+    result = findChordInNotes(notes, tuningSystem, totalSteps);
   }
   
   return result;
 }
 
-function findChordInNotes(notes: number[]): ChordResult | null {
+function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO, totalSteps: number): ChordResult | null {
   if (notes.length < 2) return null;
 
-  const bassNote = notes[0] % 53;
-  const uniqueNotes = [...new Set(notes.map(n => ((n % 53) + 53) % 53))];
+  const bassNote = notes[0] % totalSteps;
+  const uniqueNotes = [...new Set(notes.map(n => ((n % totalSteps) + totalSteps) % totalSteps))];
   const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
   
   let bestResult: ChordResult | null = null;
@@ -168,17 +183,19 @@ function findChordInNotes(notes: number[]): ChordResult | null {
     const intervals = [];
     for (let j = 0; j < sortedNotes.length; j++) {
       if (j !== i) {
-        let interval = ((sortedNotes[j] - potentialRoot + 53) % 53);
+        let interval = ((sortedNotes[j] - potentialRoot + totalSteps) % totalSteps);
         intervals.push(interval);
       }
     }
 
-    const reducedRoot = ((potentialRoot + 53) % 53);
+    const reducedRoot = ((potentialRoot + totalSteps) % totalSteps);
     const rootName = (window as any).settings.names[reducedRoot];
 
     // Try each chord quality
-    for (const [quality, spelling] of Object.entries(SETTINGS_53_EDO.CHORD_SPELLINGS)) {
-      const pattern = getChordPattern(spelling);
+    for (const [quality, spelling] of Object.entries(tuningSystem.CHORD_SPELLINGS)) {
+      const pattern = Array.isArray(spelling) ? 
+        getChordPattern(spelling, tuningSystem) : 
+        getChordPattern(spelling.spelling, tuningSystem);
       
       const sortedPattern = [...pattern].sort((a, b) => a - b);
       const sortedIntervals = [...intervals].sort((a, b) => a - b);
@@ -190,7 +207,7 @@ function findChordInNotes(notes: number[]): ChordResult | null {
         // Calculate chord tones
         const chordTones = [reducedRoot];
         for (const interval of pattern) {
-          let tone = (reducedRoot + interval) % 53;
+          let tone = (reducedRoot + interval) % totalSteps;
           chordTones.push(tone);
         }
 
@@ -205,21 +222,23 @@ function findChordInNotes(notes: number[]): ChordResult | null {
         const chordIntervals = new Set(sortedPattern);
         const additionalIntervals = sortedIntervals
           .filter(interval => !chordIntervals.has(interval))
-          .map(interval => getIntervalName(interval))
+          .map(interval => getIntervalName(interval, tuningSystem))
           .filter((name): name is string => name !== null);
 
         const result = {
           root: rootName,
-          quality,
+          quality: Array.isArray(spelling) ? quality : spelling.symbol.replace(/^C/, ''),
+          fullName: Array.isArray(spelling) ? quality : quality.replace(/^C/, ''),  // Use original quality name
           inversion,
-          additionalIntervals: additionalIntervals
+          additionalIntervals: additionalIntervals,
+          symbol: Array.isArray(spelling) ? rootName + quality : rootName + spelling.symbol.replace(/^C/, '')
         };
 
         // Score based on actual MIDI note distances
         let score = 0;
         
         // Find the root note in the original notes array
-        const rootNote = notes.find(n => n % 53 === reducedRoot);
+        const rootNote = notes.find(n => n % totalSteps === reducedRoot);
         if (rootNote !== undefined) {
           // Prefer roots that are closer to the bass note in actual MIDI distance
           score -= Math.abs(rootNote - notes[0]);

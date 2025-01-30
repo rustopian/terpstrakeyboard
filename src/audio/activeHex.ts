@@ -1,6 +1,9 @@
 import { playNote, stopNote, getMidiFromCoords } from './audioHandler';
 import { Point } from '../core/geometry';
 import { updateChordDisplay } from './chordRecognition';
+import { centsToColor } from '../grid/displayUtils';
+import { drawHex } from '../grid/displayUtils';
+import { hexCoordsToCents } from '../grid/hexUtils';
 
 declare global {
   interface WebMidiOutput {
@@ -20,6 +23,7 @@ interface Settings {
   urSteps: number;
   fundamental: number;
   octaveOffset: number;
+  activeHexObjects: ActiveHex[];
 }
 
 interface AudioResult {
@@ -29,7 +33,10 @@ interface AudioResult {
 
 let settings: Settings | undefined;
 let myOutput: WebMidiOutput | null = null;
-let activeNotes: ActiveHex[] = [];
+
+// Track both held and toggled notes
+const activeNotes = new Set<number>();
+const toggledNotes = new Set<number>();
 
 export function initActiveHex(appSettings: Settings, output: WebMidiOutput | null): void {
   settings = appSettings;
@@ -105,52 +112,81 @@ export class ActiveHex {
 }
 
 export function addActiveNote(hex: ActiveHex): void {
-  activeNotes.push(hex);
-  if (!settings) return;
-  
-  const midiNotes = activeNotes.map(hex => 
-    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset)
-  );
-  updateChordDisplay(midiNotes);
+  activeNotes.add(getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset));
+  updateChordDisplay(getActiveNotes());
 }
 
 export function removeActiveNote(hex: ActiveHex): void {
-  activeNotes = activeNotes.filter(note => 
-    note.coords.x !== hex.coords.x || note.coords.y !== hex.coords.y
-  );
-  if (!settings) return;
-  
-  const midiNotes = activeNotes.map(hex => 
-    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset)
-  );
-  updateChordDisplay(midiNotes);
+  activeNotes.delete(getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset));
+  updateChordDisplay(getActiveNotes());
 }
 
-export function clearAllNotes(): void {
-  activeNotes = [];
-  if (settings?.sustainedNotes) {
+export function releaseAllNotes(): void {
+  if (!settings) return;
+
+  // Release all active hex objects
+  if (settings.activeHexObjects) {
+    for (const hex of settings.activeHexObjects) {
+      hex.noteOff();
+      const coords = hex.coords;
+      drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+    }
+    settings.activeHexObjects = [];
+  }
+
+  // Clear all note tracking sets
+  activeNotes.clear();
+  toggledNotes.clear();
+
+  // Clear any sustained notes
+  if (settings.sustainedNotes) {
+    for (const note of settings.sustainedNotes) {
+      note.noteOff();
+    }
     settings.sustainedNotes = [];
   }
+
+  // Update the chord display
   updateChordDisplay([]);
 }
 
+export function isNoteActive(note: number): boolean {
+  return activeNotes.has(note) || toggledNotes.has(note);
+}
+
 export function getActiveNotes(): number[] {
-  if (!settings) return [];
-  
-  // First clean up any stuck notes
-  const pressedKeys = window.settings.pressedKeys || [];
-  const mouseDown = window.settings.isMouseDown || false;
-  const touchDown = window.settings.isTouchDown || false;
-  
-  if (pressedKeys.length === 0 && !mouseDown && !touchDown) {
-    clearAllNotes();
+  // Combine held and toggled notes
+  return Array.from(new Set([...activeNotes, ...toggledNotes]));
+}
+
+export function activateNote(note: number): void {
+  const settings = (window as any).settings;
+  if (settings.toggle_mode) {
+    // In toggle mode, clicking toggles the note on/off
+    if (toggledNotes.has(note)) {
+      toggledNotes.delete(note);
+    } else {
+      toggledNotes.add(note);
+    }
+  } else {
+    // Normal mode - just add to active notes
+    activeNotes.add(note);
   }
-  
-  const notes = activeNotes.map(hex => 
-    getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset)
-  );
-  if (notes.length >= 2) {
-    console.log('getActiveNotes returning multiple notes:', notes);
+  updateChordDisplay(getActiveNotes());
+}
+
+export function deactivateNote(note: number): void {
+  // Only remove from activeNotes, not toggledNotes
+  activeNotes.delete(note);
+  updateChordDisplay(getActiveNotes());
+}
+
+// Initialize release all button handler
+document.addEventListener('DOMContentLoaded', () => {
+  const releaseAllButton = document.getElementById('release-all');
+  if (releaseAllButton) {
+    releaseAllButton.addEventListener('click', () => {
+      releaseAllNotes();
+    });
   }
-  return notes;
-} 
+}); 

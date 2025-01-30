@@ -1,32 +1,18 @@
-// Import geometry functions
-import {
-  Point,
-} from './core/geometry';
-
 // Import audio functions
-import {
-  initAudio,
-  loadInstrumentSamples,
-} from './audio/audioHandler';
+import { initAudio, loadInstrumentSamples } from './audio/audioHandler';
 
 // Import event handling functions
-import {
-  initEventHandlers,
-} from './ui/eventHandler';
+import { initEventHandlers } from './ui/eventHandler';
 
 // Import hex utility functions
-import {
-  initHexUtils,
-} from './grid/hexUtils';
+import { initHexUtils } from './grid/hexUtils';
 
 // Import display utility functions
-import {
-  initDisplayUtils,
-  drawGrid
-} from './grid/displayUtils';
+import { initDisplayUtils, drawGrid } from './grid/displayUtils';
 
-// Import types
-import { Settings, QueryDataInterface } from './core/types';
+// Import types and settings
+import { Settings } from './settings/Settings';
+import { defaultSettings } from './settings/Settings';
 
 // Import query data parser
 import { QueryData } from './core/QueryData';
@@ -72,98 +58,191 @@ declare global {
 }
 
 // Global variables
-let settings: Settings = {
-  scale: [],
-  equivInterval: 0,
-  keycolors: [],
-  canvas: null as unknown as HTMLCanvasElement,
-  context: null as unknown as CanvasRenderingContext2D,
-  centerpoint: new Point(0, 0),
-  rotationMatrix: [1, 0, 0, 1, 0, 0],
-  fundamental: 0,
-  rSteps: 0,
-  urSteps: 0,
-  hexSize: 0,
-  rotation: 0,
-  hexHeight: 0,
-  hexVert: 0,
-  hexWidth: 0,
-  names: [],
-  enum: false,
-  equivSteps: 0,
-  no_labels: false,
-  spectrum_colors: false,
-  fundamental_color: '#55ff55',
-  audioContext: undefined,
-  sustain: false,
-  sustainedNotes: [],
-  activeHexObjects: [],
-  pressedKeys: [],
-  keyCodeToCoords: {},
-  midi_enabled: false,
-  isMouseDown: false,
-  isTouchDown: false,
-  audioBuffer: undefined,
-  activeSources: {},
-  fadeoutTime: 0,
-  sampleBuffer: [undefined, undefined, undefined, undefined],
-  colorVisionMode: 'normal',
-  colorSaturation: 100,
-  invert_updown: false,
-  showIntervals: false,
-  showAllNotes: false,
-  octaveOffset: 0,
-  minR: 0,
-  maxR: 0,
-  minUR: 0,
-  maxUR: 0
-};
-
-// Initialize settings manager
+let settings: Settings = { ...defaultSettings };
 const settingsManager = new SettingsManager();
-settings = settingsManager.getSettings(); // Get initial settings
+
+// Initialize settings from manager
+settings = settingsManager.getSettings();
 
 // Initialize scroll manager instance
 let scrollManager: ScrollManager | null = null;
 
-// Add color saturation update function
-function updateColorSaturation(): void {
-  settingsManager.updateColorSaturation();
-  settings = settingsManager.getSettings();
+// Get query data
+const getData = new QueryData();
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize canvas and context
+    settingsManager.initializeCanvas();
+    settings = settingsManager.getSettings();
+
+    // Initialize hex utilities with current settings
+    initHexUtils(settings);
+    
+    // Initialize display utilities
+    initDisplayUtils(settings);
+    
+    // Initialize event handlers
+    initEventHandlers(settings);
+    
+    // Initialize audio system
+    const ctx = await initAudio();
+    if (ctx) {
+        settings.audioContext = ctx;
+        console.log("[DEBUG] Audio context initialized:", ctx.state);
+    }
+    
+    // Add settings button handler
+    document.getElementById('settings-button')?.addEventListener('click', showSettings);
+    
+    // Add click handler to close modal when clicking overlay
+    document.querySelector('.modal-overlay')?.addEventListener('click', (event) => {
+        if (event.target === event.currentTarget) {
+            hideSettings();
+        }
+    });
+
+    // Load instrument samples
+    const instrumentSelect = document.getElementById('instrument') as HTMLSelectElement;
+    if (instrumentSelect) {
+        await loadInstrumentSamples();
+    }
+
+    // Initialize scroll area
+    initScrollArea();
+
+    // Load presets
+    await settingsManager.loadPresets();
+
+    // Apply URL parameters or default preset
+    if (window.location.search) {
+        const keyboard = document.getElementById("keyboard");
+        const landingPage = document.getElementById("landing-page");
+        const settingsButton = document.getElementById("settings-button");
+        
+        if (keyboard) keyboard.style.display = "block";
+        if (landingPage) landingPage.style.display = "none";
+        if (settingsButton) settingsButton.style.display = "block";
+        
+        if (instrumentSelect) {
+            instrumentSelect.value = getData.instrument ?? "organ";
+        }
+        
+        settingsManager.checkPreset(16);
+        setTimeout(() => { goKeyboard(); }, 1500);
+    } else {
+        showSettings();
+    }
+
+    // Initialize note configuration
+    settingsManager.initNoteConfig();
+
+    // Initialize all event listeners
+    initializeEventListeners();
+});
+
+// Initialize all event listeners
+function initializeEventListeners(): void {
+    // Pitch type change handler
+    document.getElementById('pitch-type')?.addEventListener('change', () => {
+        settingsManager.handlePitchTypeChange();
+        settingsManager.handleCentralOctaveChange();
+        settings = settingsManager.getSettings();
+    });
+
+    // Central octave change handler
+    document.getElementById('central-octave')?.addEventListener('input', () => {
+        settingsManager.handleCentralOctaveChange();
+        settings = settingsManager.getSettings();
+    });
+
+    // Text size handler
+    document.getElementById('text-size')?.addEventListener('input', (event) => {
+        const slider = event.target as HTMLInputElement;
+        settings.textSize = parseFloat(slider.value);
+        settingsManager.updateKeyboardDisplay();
+        settings = settingsManager.getSettings();
+    });
+
+    // Color vision mode handler
+    const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
+    if (colorVisionSelect) {
+        colorVisionSelect.value = settings.colorVisionMode;
+        colorVisionSelect.addEventListener('change', () => {
+            settingsManager.updateColorVisionMode();
+            settingsManager.updatePreviewButtons();
+            settings = settingsManager.getSettings();
+        });
+    }
+
+    // Color saturation handler
+    const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
+    if (saturationSlider) {
+        saturationSlider.addEventListener('input', () => {
+            settingsManager.updateColorSaturation();
+            settingsManager.updatePreviewButtons();
+            settings = settingsManager.getSettings();
+        });
+    }
+
+    // Invert up/down handler
+    const invertUpdownCheckbox = document.getElementById('invert-updown') as HTMLInputElement;
+    if (invertUpdownCheckbox) {
+        invertUpdownCheckbox.addEventListener('change', () => {
+            settings.invert_updown = invertUpdownCheckbox.checked;
+            settingsManager.updatePreviewButtons();
+            settingsManager.updateKeyboardDisplay();
+            settings = settingsManager.getSettings();
+        });
+    }
+
+    // MIDI input handler
+    document.getElementById('midi_input')?.addEventListener('change', (event) => {
+        const checkbox = event.target as HTMLInputElement;
+        settings.midi_enabled = checkbox.checked;
+        if (checkbox.checked) {
+            if (window.WebMidi) {
+                window.WebMidi
+                    .enable()
+                    .then(onEnabled)
+                    .catch((err: Error) => {
+                        console.error("WebMidi enable error:", err);
+                        alert(err);
+                    });
+            }
+        } else {
+            if (window.WebMidi && window.WebMidi.enabled) {
+                window.WebMidi.disable();
+            }
+        }
+    });
 }
 
-// Add color vision mode update function
-function updateColorVisionMode(): void {
-  settingsManager.updateColorVisionMode();
-  settings = settingsManager.getSettings();
+// Add scroll area functionality with edge detection
+function initScrollArea(): void {
+    if (scrollManager) {
+        scrollManager.cleanup();
+    }
+    scrollManager = new ScrollManager(settings);
 }
 
-// Make functions available globally
+// Make necessary functions available globally
 window.back = back;
 window.settings = settings;
-window.changeURL = changeURL;
+window.changeURL = () => settingsManager.changeURL();
 window.noPreset = () => settingsManager.noPreset();
 window.hideRevealColors = () => settingsManager.hideRevealColors();
 window.hideRevealNames = () => settingsManager.hideRevealNames();
 window.hideRevealEnum = () => settingsManager.hideRevealEnum();
-window.updateColorVisionMode = updateColorVisionMode;
-window.updateColorSaturation = updateColorSaturation;
+window.updateColorVisionMode = () => {
+    settingsManager.updateColorVisionMode();
+    settings = settingsManager.getSettings();
+};
+window.updateColorSaturation = () => {
+    settingsManager.updateColorSaturation();
+    settings = settingsManager.getSettings();
+};
 window.updateKeyboardDisplay = () => settingsManager.updateKeyboardDisplay();
-
-if (window.WebMidi) {
-  // Only enable WebMidi if the checkbox is checked
-  const midiInputCheckbox = document.getElementById('midi_input') as HTMLInputElement;
-  console.log("MIDI input checkbox state:", midiInputCheckbox?.checked);
-  if (midiInputCheckbox && midiInputCheckbox.checked) {
-    window.WebMidi
-      .enable()
-      .then(onEnabled)
-      .catch((err: Error) => {
-        console.error("WebMidi enable error:", err);
-        alert(err);
-      });
-  }
-}
 
 function onEnabled(): void {
   if (window.WebMidi.outputs) {
@@ -225,8 +304,6 @@ if (settingsForm) {
   settingsForm.onsubmit = goKeyboard;
 }
 
-const getData: QueryDataInterface = new QueryData(location.search, true);
-
 function setInputValue(id: string, defaultValue: any): void {
   const element = document.getElementById(id) as HTMLInputElement;
   if (element) {
@@ -283,51 +360,6 @@ settingsManager.hideRevealNames();
 settingsManager.hideRevealColors();
 settingsManager.hideRevealEnum();
 
-function changeURL(): void {
-  let url = window.location.pathname + "?";
-
-  function getElementValue(id: string): string {
-    const element = document.getElementById(id) as HTMLInputElement;
-    return element ? (element.type === 'checkbox' ? element.checked.toString() : element.value) : '';
-  }
-
-  // Add all parameters to URL
-  const params = [
-    "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
-    "instrument", "enum", "equivSteps", "spectrum_colors",
-    "fundamental_color", "no_labels", "midi_input", "invert-updown",
-    "show_intervals", "show_all_notes"
-  ];
-
-  url += params.map(param => `${param}=${getElementValue(param)}`).join('&');
-
-  // Add scale, names, and note_colors
-  ["scale", "names", "note_colors"].forEach(param => {
-    const value = getElementValue(param);
-    if (value) {
-      url += `&${param}=${encodeURIComponent(value)}`;
-    }
-  });
-
-  // Find scl file description for the page title
-  const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
-  if (scaleElement) {
-    const scaleLines = scaleElement.value.split('\n');
-    let description = "Terpstra Keyboard WebApp";
-
-    for (const line of scaleLines) {
-      if (line.match(/[a-zA-Z]+/) && !line.match(/^!/)) {
-        description = line;
-        break;
-      }
-    }
-
-    document.title = description;
-  }
-
-  window.history.replaceState({}, '', url);
-}
-
 function resizeHandler(): void {
   settingsManager.updateDimensions();
   settings = settingsManager.getSettings();
@@ -369,7 +401,7 @@ function back(): void {
 }
 
 function goKeyboard(): boolean {
-  changeURL();
+  settingsManager.changeURL();
   console.log("[DEBUG] Starting goKeyboard...");
 
   // Hide settings and show keyboard
@@ -412,7 +444,7 @@ function goKeyboard(): boolean {
     settings.audioContext.resume().then(() => {
       console.log("[DEBUG] Existing audio context resumed:", settings.audioContext?.state);
       loadInstrumentSamples();
-    }).catch(error => {
+    }).catch((error: any) => {
       console.error("[DEBUG] Error resuming existing audio context:", error);
     });
   }
@@ -440,132 +472,4 @@ function goKeyboard(): boolean {
   initEventHandlers(settings);
 
   return false;
-}
-
-window.addEventListener('load', () => {
-  // Initialize settings manager with presets
-  settingsManager.loadPresets().then(() => {
-    // Initialize scroll area
-    initScrollArea();
-    
-    // Initialize audio context immediately
-    const ctx = initAudio();
-    if (ctx) {
-      settings.audioContext = ctx;
-      console.log("[DEBUG] Audio context initialized on load:", ctx.state);
-    }
-    
-    // Add settings button handler
-    document.getElementById('settings-button')?.addEventListener('click', showSettings);
-    
-    // Add click handler to close modal when clicking overlay
-    document.querySelector('.modal-overlay')?.addEventListener('click', (event) => {
-      if (event.target === event.currentTarget) {
-        hideSettings();
-      }
-    });
-    
-    // Add MIDI input checkbox handler
-    document.getElementById('midi_input')?.addEventListener('change', (event) => {
-      const checkbox = event.target as HTMLInputElement;
-      settings.midi_enabled = checkbox.checked;
-      console.log("MIDI input enabled changed to:", checkbox.checked);
-      if (checkbox.checked) {
-        if (window.WebMidi) {
-          window.WebMidi
-            .enable()
-            .then(onEnabled)
-            .catch((err: Error) => {
-              console.error("WebMidi enable error:", err);
-              alert(err);
-            });
-        }
-      } else {
-        // Disable MIDI
-        if (window.WebMidi && window.WebMidi.enabled) {
-          console.log("Disabling WebMidi");
-          window.WebMidi.disable();
-        }
-      }
-    });
-    
-    // Initialize keyboard immediately if URL has parameters, otherwise show settings
-    if (window.location.search) {
-      const keyboard = document.getElementById("keyboard");
-      const landingPage = document.getElementById("landing-page");
-      const settingsButton = document.getElementById("settings-button");
-      
-      if (keyboard) keyboard.style.display = "block";
-      if (landingPage) landingPage.style.display = "none";
-      if (settingsButton) settingsButton.style.display = "block";
-      
-      const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-      if (instrumentSelect) {
-        instrumentSelect.value = getData.instrument ?? "organ";
-      }
-      setTimeout(() => { goKeyboard(); }, 1500);
-    } else {
-      showSettings();
-    }
-
-    // Initialize note configuration
-    settingsManager.initNoteConfig();
-
-    // Add pitch type change handler
-    document.getElementById('pitch-type')?.addEventListener('change', () => {
-      settingsManager.handlePitchTypeChange();
-      // Update central octave after pitch type change
-      settingsManager.handleCentralOctaveChange();
-      settings = settingsManager.getSettings();
-    });
-
-    // Add central octave change handler
-    document.getElementById('central-octave')?.addEventListener('input', () => {
-      settingsManager.handleCentralOctaveChange();
-      settings = settingsManager.getSettings();
-    });
-
-    // Initialize color vision mode and add listeners
-    const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
-    if (colorVisionSelect) {
-      colorVisionSelect.value = settings.colorVisionMode;
-      colorVisionSelect.addEventListener('change', () => {
-        settingsManager.updateColorVisionMode();
-        settingsManager.updatePreviewButtons();
-        settings = settingsManager.getSettings();
-      });
-    }
-
-    // Add color saturation slider listener
-    const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
-    if (saturationSlider) {
-      saturationSlider.addEventListener('input', () => {
-        settingsManager.updateColorSaturation();
-        settingsManager.updatePreviewButtons();
-        settings = settingsManager.getSettings();
-      });
-    }
-
-    // Add invert up/down checkbox listener
-    const invertUpdownCheckbox = document.getElementById('invert-updown') as HTMLInputElement;
-    if (invertUpdownCheckbox) {
-      invertUpdownCheckbox.addEventListener('change', () => {
-        settings.invert_updown = invertUpdownCheckbox.checked;
-        settingsManager.updatePreviewButtons();
-        settingsManager.updateKeyboardDisplay();
-        settings = settingsManager.getSettings();
-      });
-    }
-  });
-}, false);
-
-// Add scroll area functionality with edge detection
-function initScrollArea(): void {
-  // Clean up existing scroll manager if it exists
-  if (scrollManager) {
-    scrollManager.cleanup();
-  }
-  
-  // Create new scroll manager instance
-  scrollManager = new ScrollManager(settings);
 }

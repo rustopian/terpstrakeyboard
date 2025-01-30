@@ -2,8 +2,8 @@
 
 interface IntervalData {
   intervalName: string;
-  justRatio: string;
-  errorCents: number;
+  justRatio?: string;
+  errorCents?: number;
   sizeCents?: number;
   justCents?: number;
   limit?: number;
@@ -13,7 +13,7 @@ export interface TuningSystem {
   NATURAL_NOTE_STEPS: { [key: string]: number };
   MODIFIER_STEPS: { [key: string]: number };
   INTERVAL_DICT: { [key: number]: IntervalData[] };
-  CHORD_SPELLINGS: { [key: string]: string[] };
+  CHORD_SPELLINGS: { [key: string]: string[] } | { [key: string]: { symbol: string; spelling: string[] } };
 }
 
 // 12-TET System
@@ -61,6 +61,283 @@ export const SETTINGS_12_TET: TuningSystem = {
     'Minor 7th': ['C', 'Eb', 'G', 'Bb'],
     'Half Diminished 7th': ['C', 'Eb', 'Gb', 'Bb'],
     'Fully Diminished 7th': ['C', 'Eb', 'Gb', 'A']
+  }
+};
+
+// 31-EDO System
+export const SETTINGS_31_EDO: TuningSystem = {
+  NATURAL_NOTE_STEPS: {
+    C: 0,
+    D: 5,
+    E: 10,
+    F: 13,
+    G: 18,
+    A: 23,
+    B: 28
+  },
+  MODIFIER_STEPS: {
+    '↑': 1,
+    '#': 2,
+    'b': -2,
+    '↓': -1,
+    '♯': 2,  // Unicode sharp
+    '♭': -2  // Unicode flat
+  },
+  INTERVAL_DICT: {
+    0: [
+      {
+        intervalName: 'Perfect Unison',
+        sizeCents: 0
+      }
+    ],
+    1: [
+      {
+        intervalName: 'Super Unison',
+        sizeCents: 38.71
+      }
+    ],
+    2: [
+      {
+        intervalName: 'Augmented Unison',
+        sizeCents: 77.42
+      }
+    ],
+    3: [
+      {
+        intervalName: 'Minor Second',
+        sizeCents: 116.13
+      }
+    ],
+    4: [
+      {
+        intervalName: 'Neutral Second',
+        sizeCents: 154.84
+      }
+    ],
+    5: [
+      {
+        intervalName: 'Major Second',
+        sizeCents: 193.55
+      }
+    ],
+    6: [
+      {
+        intervalName: 'Supermajor Second',
+        sizeCents: 232.26
+      }
+    ],
+    7: [
+      {
+        intervalName: 'Subminor Third',
+        sizeCents: 270.97
+      }
+    ],
+    8: [
+      {
+        intervalName: 'Minor Third',
+        sizeCents: 309.68
+      }
+    ],
+    9: [
+      {
+        intervalName: 'Neutral Third',
+        sizeCents: 348.39
+      }
+    ],
+    10: [
+      {
+        intervalName: 'Major Third',
+        sizeCents: 387.1
+      }
+    ],
+    11: [
+      {
+        intervalName: 'Supermajor Third',
+        sizeCents: 425.81
+      }
+    ],
+    12: [
+      {
+        intervalName: 'Sub Fourth',
+        sizeCents: 464.52
+      }
+    ],
+    13: [
+      {
+        intervalName: 'Perfect Fourth',
+        sizeCents: 503.23
+      }
+    ],
+    14: [
+      {
+        intervalName: 'Super Fourth',
+        sizeCents: 541.94
+      }
+    ],
+    15: [
+      {
+        intervalName: 'Augmented Fourth',
+        sizeCents: 580.65
+      }
+    ],
+    16: [
+      {
+        intervalName: 'Diminished Fifth',
+        sizeCents: 619.35
+      }
+    ],
+    17: [
+      {
+        intervalName: 'Sub Fifth',
+        sizeCents: 658.06
+      }
+    ],
+    18: [
+      {
+        intervalName: 'Perfect Fifth',
+        sizeCents: 696.77
+      }
+    ],
+    19: [
+      {
+        intervalName: 'Super Fifth',
+        sizeCents: 735.48
+      }
+    ],
+    20: [
+      {
+        intervalName: 'Subminor Sixth',
+        sizeCents: 774.19
+      }
+    ],
+    21: [
+      {
+        intervalName: 'Minor Sixth',
+        sizeCents: 812.9
+      }
+    ],
+    22: [
+      {
+        intervalName: 'Neutral Sixth',
+        sizeCents: 851.61
+      }
+    ],
+    23: [
+      {
+        intervalName: 'Major Sixth',
+        sizeCents: 890.32
+      }
+    ],
+    24: [
+      {
+        intervalName: 'Supermajor Sixth',
+        sizeCents: 929.03
+      }
+    ],
+    25: [
+      {
+        intervalName: 'Subminor Seventh',
+        sizeCents: 967.74
+      }
+    ],
+    26: [
+      {
+        intervalName: 'Minor Seventh',
+        sizeCents: 1006.45
+      }
+    ],
+    27: [
+      {
+        intervalName: 'Neutral Seventh',
+        sizeCents: 1045.16
+      }
+    ],
+    28: [
+      {
+        intervalName: 'Major Seventh',
+        sizeCents: 1083.87
+      }
+    ],
+    29: [
+      {
+        intervalName: 'Supermajor Seventh',
+        sizeCents: 1122.58
+      }
+    ],
+    30: [
+      {
+        intervalName: 'Sub Octave',
+        sizeCents: 1161.29
+      }
+    ],
+    31: [
+      {
+        intervalName: 'Perfect Octave',
+        sizeCents: 1200
+      }
+    ]
+  },
+  CHORD_SPELLINGS: {
+      // Standard Triads
+      'Major': { symbol: 'C', spelling: ['C4', 'E4', 'G4'] },
+      'Minor': { symbol: 'Cm', spelling: ['C4', 'E♭4', 'G4'] },
+      'Subminor': { symbol: 'Cs', spelling: ['C4', '↓E4', 'G4'] },
+      'Supermajor': { symbol: 'CS', spelling: ['C4', '↑E4', 'G4'] },
+      'Neutral': { symbol: 'Cn', spelling: ['C4', '↓E4', 'G4'] },
+      'Augmented': { symbol: 'C+', spelling: ['C4', 'E4', 'G♯4'] },
+      'Diminished': { symbol: 'Co', spelling: ['C4', 'E♭4', 'G♭4'] },
+      'Harmonic Diminished': { symbol: 'Cm(♭♭5)', spelling: ['C4', 'E♭4', '↓↓G4'] },
+      'Subminor Diminished': { symbol: 'Cs(♭♭5)', spelling: ['C4', '↓E4', '↓↓G4'] },
+      'Septimal Wolf Major': { symbol: 'CS(↑5)', spelling: ['C4', '↑E4', '↑G4'] },
+      'Septimal Wolf Minor': { symbol: 'Cm(↑5)', spelling: ['C4', 'E♭4', '↑G4'] },
+      'Subfifth Minor': { symbol: 'Cm(↓5)', spelling: ['C4', 'E♭4', '↓G4'] },
+      'Subfifth Neutral': { symbol: 'Cn(↓5)', spelling: ['C4', '↓E4', '↓G4'] },
+      'DRmaj': { symbol: 'C(↓5)', spelling: ['C4', 'E4', '↓G4'] },
+      'DRmindim': { symbol: 'Cs(↓5)', spelling: ['C4', '↓E4', '↓G4'] },
+      'Orwell': { symbol: 'Cs(♭♭5)', spelling: ['C4', 'D♯4', '↑F4'] },
+      'Squares': { symbol: 'CS(×5)', spelling: ['C4', '↑E4', '↓A4'] },
+    
+      // Basic Tetrads
+      'Major Seven': { symbol: 'CM7', spelling: ['C4', 'E4', 'G4', 'B4'] },
+      'Harmonic Seven': { symbol: 'Ch7', spelling: ['C4', 'E4', 'G4', '↓B♭4'] },
+      'Minor Seven': { symbol: 'Cm7', spelling: ['C4', 'E♭4', 'G4', 'B♭4'] },
+      'Utonal Tetrad': { symbol: 'CmS6', spelling: ['C4', 'E♭4', 'G4', '↑A4'] },
+      'Subminor Seven': { symbol: 'Cs7', spelling: ['C4', '↓E4', 'G4', '↓B♭4'] },
+      'Undecimal Tetrad': { symbol: 'Csn7', spelling: ['C4', '↓E4', 'G4', '↓B4'] },
+      'Supermajor Seven': { symbol: 'CS7', spelling: ['C4', '↑E4', 'G4', '↑B4'] },
+      '9-Over Tetrad': { symbol: 'CSm7', spelling: ['C4', '↑E4', 'G4', 'B♭4'] },
+      'Neutral Tetrad': { symbol: 'Cn7', spelling: ['C4', '↓E4', 'G4', '↓B4'] },
+    
+      // Split Chords
+      'Split Chord': { symbol: 'CMm3', spelling: ['C4', 'E♭4', 'E4', 'G4'] },
+      'Septimal Split Chord': { symbol: 'CSs3', spelling: ['C4', '↓E4', '↑E4', 'G4'] },
+      'YB Split Chord': { symbol: 'CMs3', spelling: ['C4', '↓E4', 'E4', 'G4'] },
+      'GR Split Chord': { symbol: 'CSm3', spelling: ['C4', 'E♭4', '↑E4', 'G4'] },
+      'Wolf Split Chord': { symbol: 'CSm3(↑5)', spelling: ['C4', 'E♭4', '↑E4', '↑G4'] },
+      'Squares Split Chord': { symbol: 'CSn3(♯5)', spelling: ['C4', '↓E4', '↑E4', 'G♯4'] },
+      'DR Split Chord': { symbol: 'CMs3(↓5)', spelling: ['C4', '↓E4', 'E4', '↓G4'] },
+    
+      // Dominant and Extended Chords
+      'Dominant Seven': { symbol: 'C7', spelling: ['C4', 'E4', 'G4', 'B♭4'] },
+      'Major Nine': { symbol: 'CM9', spelling: ['C4', 'E4', 'G4', 'B4', 'D4'] },
+      'Harmonic Nine': { symbol: 'Ch9', spelling: ['C4', 'E4', 'G4', '↓B♭4', 'D4'] },
+      'Minor Nine': { symbol: 'Cm9', spelling: ['C4', 'E♭4', 'G4', 'B♭4', 'D4'] },
+      'Subminor Nine': { symbol: 'Cs9', spelling: ['C4', '↓E4', 'G4', '↓B♭4', 'D4'] },
+      'Supermajor Nine': { symbol: 'CS9', spelling: ['C4', '↑E4', 'G4', '↑B4', 'D4'] },
+    
+      // Sus Chords
+      'Sus4': { symbol: 'Csus', spelling: ['C4', 'F4', 'G4'] },
+      'Sus2': { symbol: 'Csus2', spelling: ['C4', 'D4', 'G4'] },
+      'Sus^4': { symbol: 'Csus(↑4)', spelling: ['C4', '↑F4', 'G4'] },
+      'Susv4': { symbol: 'Csus(↓4)', spelling: ['C4', '↓F4', 'G4'] },
+      'Sus^2': { symbol: 'Csus(↑2)', spelling: ['C4', '↑D4', 'G4'] },
+      'DRsus4': { symbol: 'Csus(↓4,↓5)', spelling: ['C4', '↓F4', '↓G4'] },
+      'DRsus2': { symbol: 'Csus2(↓5)', spelling: ['C4', 'D4', '↓G4'] },
+    
+      // Other Extended Chords
+      'Major 6/9': { symbol: 'C6/9', spelling: ['C4', 'E4', 'G4', 'A4', 'D4'] },
+      'Harmonic #9': { symbol: 'Ch7♯9', spelling: ['C4', 'E4', 'G4', '↓B♭4', 'D♯4'] },
+      'Harmonic ♭♭9': { symbol: 'Ch7♭♭9', spelling: ['C4', 'E4', 'G4', '↓B♭4', '↓↓D4'] }
   }
 };
 

@@ -2,7 +2,8 @@
 import { Point } from '../core/geometry';
 import { hexCoordsToScreen, getHexVertices, hexCoordsToCents } from './hexUtils';
 import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils';
-import { Settings, CentsResult } from '../core/types';
+import { CentsResult } from '../core/types';
+import { Settings } from '../settings/Settings';
 
 let settings: Settings;
 export let current_text_color = "#000000";
@@ -39,10 +40,10 @@ export function drawHex(coords: Point, color?: string): void {
   settings.context.fill();
 
   // Draw shadows on left edges
-  settings.context.globalCompositeOperation = 'source-atop'; // Changed to source-atop for better blending
+  settings.context.globalCompositeOperation = 'source-atop';
   settings.context.lineWidth = 2;
   settings.context.filter = 'blur(2px)';
-  settings.context.strokeStyle = 'rgba(0, 0, 0, 0.2)'; // Slightly increased opacity
+  settings.context.strokeStyle = 'rgba(0, 0, 0, 0.2)';
   
   // Draw all three left edges in one path
   settings.context.beginPath();
@@ -52,15 +53,33 @@ export function drawHex(coords: Point, color?: string): void {
   settings.context.lineTo(x[3], y[3]);
   settings.context.stroke();
 
-  // Reset context
+  // Reset context for hexagon outline
   settings.context.filter = 'none';
   settings.context.globalCompositeOperation = 'source-over';
+
+  // Draw key image if enabled (after shadows, with normal blending)
+  if (settings.useKeyImage && settings.keyImage === 'hexagon') {
+    settings.context.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    settings.context.lineWidth = 1.5;
+    settings.context.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const curr = i;
+      const next = (i + 1) % 6;
+      if (i === 0) {
+        settings.context.moveTo(x[curr], y[curr]);
+      }
+      settings.context.lineTo(x[next], y[next]);
+    }
+    settings.context.closePath();
+    settings.context.stroke();
+  }
+
   settings.context.restore();
 
   drawHexLabel(coords, hexCenter);
 }
 
-function drawHexLabel(p: Point, hexCenter: Point): void {
+function drawHexLabel(coords: Point, hexCenter: Point): void {
   // Add note name and equivalence interval multiple
   settings.context.save();
   
@@ -73,13 +92,13 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
   settings.context.translate(hexCenter.x, hexCenter.y);
   settings.context.rotate(-settings.rotation);
 
-  // Use current_text_color directly instead of getting contrast
   settings.context.fillStyle = current_text_color;
-  settings.context.font = "22pt Arial";
+  const baseSize = 22 * (settings.textSize || 1); // textSize ranges from 0.2 to 1.0
+  settings.context.font = `${baseSize}pt Arial`;
   settings.context.textAlign = "center";
   settings.context.textBaseline = "middle";
 
-  const note = p.x * settings.rSteps + p.y * settings.urSteps;
+  const note = coords.x * settings.rSteps + coords.y * settings.urSteps;
   const equivSteps = settings.enum ? settings.equivSteps : settings.scale.length;
   const equivMultiple = Math.floor(note / equivSteps);
   let reducedNote = note % equivSteps;
@@ -94,7 +113,28 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
       let scaleFactor = name.length > 3 ? 3 / name.length : 1;
       scaleFactor *= settings.hexSize / 50;
       settings.context.scale(scaleFactor, scaleFactor);
-      settings.context.fillText(name, 0, 0);
+      
+      // Handle flat symbol kerning - adjust kerning for flat symbol (♭)
+      const flatSymbol = '♭';
+      if (name.includes(flatSymbol)) {
+        // Split and clean any whitespace around the flat symbol
+        const parts = name.split(flatSymbol).map(part => part.trim());
+        const beforeFlat = parts[0];
+        const afterFlat = parts.slice(1).join(flatSymbol).trim();
+        // Increase kerning amount significantly
+        const flatKerning = -0.3 * settings.context.measureText(flatSymbol).width;
+        const totalWidth = settings.context.measureText(name).width + flatKerning;
+        
+        // Center the entire note name by offsetting by half the total width
+        const centerOffset = -totalWidth / 2;
+        
+        settings.context.textAlign = "left";
+        settings.context.fillText(beforeFlat, centerOffset, 0);
+        settings.context.fillText(flatSymbol + afterFlat, centerOffset + settings.context.measureText(beforeFlat).width + flatKerning, 0);
+      } else {
+        settings.context.textAlign = "center";
+        settings.context.fillText(name, 0, 0);
+      }
       settings.context.restore();
     }
 
@@ -102,7 +142,7 @@ function drawHexLabel(p: Point, hexCenter: Point): void {
     settings.context.scale(scaleFactor, scaleFactor);
     settings.context.translate(10, -25);
     settings.context.fillStyle = current_text_color;
-    settings.context.font = "12pt Arial";
+    settings.context.font = `${baseSize * 0.55}pt Arial`; // Smaller font for octave number
     settings.context.textAlign = "center";
     settings.context.textBaseline = "middle";
     settings.context.fillText((equivMultiple + (settings.octaveOffset || 0) + 4).toString(), 0, 0);

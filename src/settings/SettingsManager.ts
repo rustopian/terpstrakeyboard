@@ -141,17 +141,26 @@ export class SettingsManager {
         this.settings.rotation = (parseFloat((document.getElementById("rotation") as HTMLInputElement).value) * 2 * Math.PI) / 360;
 
         // Load checkbox settings
-        this.settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement).checked;
-        this.settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement).checked;
-        this.settings.enum = (document.getElementById('enum') as HTMLInputElement).checked;
-        this.settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement).value);
-        this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
-        this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
-        this.settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
+        this.settings.no_labels = (document.getElementById('no_labels') as HTMLInputElement)?.checked ?? false;
+        this.settings.spectrum_colors = (document.getElementById('spectrum_colors') as HTMLInputElement)?.checked ?? false;
+        this.settings.enum = (document.getElementById('enum') as HTMLInputElement)?.checked ?? false;
+        this.settings.equivSteps = parseInt((document.getElementById('equivSteps') as HTMLInputElement)?.value ?? "0");
+        this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement)?.checked ?? false;
+        this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement)?.checked ?? false;
+        this.settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement)?.checked ?? false;
+        this.settings.useSymbolicChordNotation = (document.getElementById('symbolic-chord-notation') as HTMLInputElement)?.checked ?? false;
+        this.settings.toggle_mode = (document.getElementById('toggle_mode') as HTMLInputElement)?.checked ?? false;
+        
+        // Load key image settings
+        const keyImageSelect = document.getElementById('key-image') as HTMLSelectElement;
+        if (keyImageSelect) {
+            this.settings.useKeyImage = keyImageSelect.value !== 'none';
+            this.settings.keyImage = keyImageSelect.value;
+        }
 
         // Load colors and names
         this.settings.fundamental_color = (document.getElementById('fundamental_color') as HTMLInputElement).value;
-        this.settings.names = (document.getElementById('names') as HTMLInputElement).value.split('\n');
+        this.settings.names = (document.getElementById('names') as HTMLTextAreaElement).value.split('\n');
     }
 
     public parseScale(): void {
@@ -226,6 +235,10 @@ export class SettingsManager {
         this.settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
         this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
+        
+        // Safely check for symbolic chord notation checkbox
+        const symbolicNotationCheckbox = document.getElementById('symbolic-chord-notation') as HTMLInputElement;
+        this.settings.useSymbolicChordNotation = symbolicNotationCheckbox ? symbolicNotationCheckbox.checked : false;
             
         // Parse scale and colors
         this.parseScaleColors();
@@ -552,6 +565,11 @@ export class SettingsManager {
         this.hideRevealNames();
         this.hideRevealColors();
         this.hideRevealEnum();
+
+        if (parameters.symbolic_chord_notation !== undefined) {
+            (document.getElementById('symbolic-chord-notation') as HTMLInputElement).checked = 
+                parameters.symbolic_chord_notation === 'true';
+        }
     }
 
     // Update note configuration from preset parameters
@@ -572,7 +590,8 @@ export class SettingsManager {
             'midi_input': parameters.midi_input,
             'invert-updown': parameters.invert_updown,
             'show_intervals': parameters.show_intervals,
-            'show_all_notes': parameters.show_all_notes
+            'show_all_notes': parameters.show_all_notes,
+            'toggle_mode': parameters.toggle_mode
         };
 
         // Update each form input if parameter exists
@@ -657,7 +676,7 @@ export class SettingsManager {
         }
     }
 
-    private changeURL(): void {
+    public changeURL(): void {
         let url = window.location.pathname + "?";
 
         function getElementValue(id: string): string {
@@ -670,7 +689,8 @@ export class SettingsManager {
             "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
             "instrument", "enum", "equivSteps", "spectrum_colors",
             "fundamental_color", "no_labels", "midi_input", "invert-updown",
-            "show_intervals", "show_all_notes"
+            "show_intervals", "show_all_notes", "key-image", "symbolic-chord-notation",
+            "toggle_mode"
         ];
 
         url += params.map(param => `${param}=${getElementValue(param)}`).join('&');

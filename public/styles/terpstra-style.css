@@ -110,6 +110,26 @@ select#quicklinks {
   background-color: rgba(0, 0, 0, 0.9);
 }
 
+.release-all-button {
+  position: fixed;
+  bottom: 70px;  /* Position above settings button */
+  left: 20px;
+  padding: 10px 20px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  z-index: 1000;
+  font-size: 16px;
+  height: 40px;
+  line-height: 20px;  /* Center text vertically */
+}
+
+.release-all-button:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;

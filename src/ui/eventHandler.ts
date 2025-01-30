@@ -2,7 +2,8 @@
 import { hexCoordsToCents, getHexCoordsAt } from '../grid/hexUtils';
 import { Point } from '../core/geometry';
 import { centsToColor, drawHex } from '../grid/displayUtils';
-import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote } from '../audio/activeHex';
+import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote, activateNote, deactivateNote, isNoteActive } from '../audio/activeHex';
+import { getMidiFromCoords } from '../audio/audioHandler';
 
 interface Settings {
   canvas: HTMLCanvasElement;
@@ -17,6 +18,7 @@ interface Settings {
   urSteps: number;
   fundamental: number;
   octaveOffset: number;
+  toggle_mode: boolean;
   [key: string]: any; // For any additional properties
 }
 
@@ -180,17 +182,53 @@ const mouseDown = (e: MouseEvent) => {
     return;
   }
   settings.isMouseDown = true;
-  settings.canvas.addEventListener("mousemove", mouseActive, false);
-  mouseActive(e);
+  
+  // Get the hex coordinates for the click
+  const coords = getHexCoordsAt(getPointerPosition(e));
+  
+  if (settings.toggle_mode) {
+    // In toggle mode, just toggle the note on click
+    const hex = new ActiveHex(coords);
+    const note = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+    
+    if (isNoteActive(note)) {
+      // Note is active, deactivate it
+      if (settings.activeHexObjects) {
+        const hexIndex = settings.activeHexObjects.findIndex((h) => coords.equals(h.coords));
+        if (hexIndex !== -1) {
+          const hex = settings.activeHexObjects[hexIndex];
+          hex.noteOff();
+          removeActiveNote(hex);
+          settings.activeHexObjects.splice(hexIndex, 1);
+          drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+        }
+      }
+    } else {
+      // Note is not active, activate it
+      if (!settings.activeHexObjects) {
+        settings.activeHexObjects = [];
+      }
+      settings.activeHexObjects.push(hex);
+      addActiveNote(hex);
+      const centsObj = hexCoordsToCents(coords);
+      hex.noteOn(centsObj);
+      drawHex(coords, centsToColor(centsObj, true));
+    }
+  } else {
+    // In normal mode, use the original behavior
+    settings.canvas.addEventListener("mousemove", mouseActive, false);
+    mouseActive(e);
+  }
 };
 
 const mouseUp = (_e: MouseEvent) => {
   if (!settings) return;
   
   settings.isMouseDown = false;
-  if (settings.pressedKeys.length !== 0 || settings.isTouchDown) {
+  if (settings.pressedKeys.length !== 0 || settings.isTouchDown || settings.toggle_mode) {
     return;
   }
+  
   settings.canvas.removeEventListener("mousemove", mouseActive);
   if (settings.activeHexObjects && settings.activeHexObjects.length > 0) {
     for (const hex of settings.activeHexObjects) {
@@ -217,7 +255,7 @@ interface Position {
 }
 
 function mouseActive(e: MouseEvent): void {
-  if (!settings) return;
+  if (!settings || settings.toggle_mode) return;
   
   let coords = getPointerPosition(e);
   coords = getHexCoordsAt(coords);
@@ -290,6 +328,47 @@ function handleTouch(e: TouchEvent): void {
     settings.isTouchDown = false;
     return;
   }
+
+  if (settings.toggle_mode) {
+    // Only handle touchstart events in toggle mode
+    if (e.type === 'touchstart') {
+      const touch = e.touches[0];
+      const coords = getHexCoordsAt(new Point(
+        touch.pageX - settings.canvas.offsetLeft,
+        touch.pageY - settings.canvas.offsetTop
+      ));
+      
+      const note = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+      
+      if (isNoteActive(note)) {
+        // Note is active, deactivate it
+        if (settings.activeHexObjects) {
+          const hexIndex = settings.activeHexObjects.findIndex((h) => coords.equals(h.coords));
+          if (hexIndex !== -1) {
+            const hex = settings.activeHexObjects[hexIndex];
+            hex.noteOff();
+            removeActiveNote(hex);
+            settings.activeHexObjects.splice(hexIndex, 1);
+            drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+          }
+        }
+      } else {
+        // Note is not active, activate it
+        const hex = new ActiveHex(coords);
+        if (!settings.activeHexObjects) {
+          settings.activeHexObjects = [];
+        }
+        settings.activeHexObjects.push(hex);
+        addActiveNote(hex);
+        const centsObj = hexCoordsToCents(coords);
+        hex.noteOn(centsObj);
+        drawHex(coords, centsToColor(centsObj, true));
+      }
+    }
+    return;
+  }
+
+  // Original behavior for non-toggle mode
   settings.isTouchDown = e.targetTouches.length !== 0;
 
   if (!settings.activeHexObjects) {
@@ -340,4 +419,27 @@ function handleTouch(e: TouchEvent): void {
 // Adding a placeholder implementation
 function setupShakeEvents(): void {
   // Implementation needed
+}
+
+export function handleHexClick(event: MouseEvent | TouchEvent, hexCoords: { x: number, y: number }): void {
+  const settings = (window as any).settings;
+  if (!settings) return;
+
+  const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+  
+  if (settings.toggle_mode) {
+    // In toggle mode, just toggle the note
+    if (isNoteActive(note)) {
+      deactivateNote(note);
+    } else {
+      activateNote(note);
+    }
+  } else {
+    // In normal mode, activate on mouse/touch down
+    if (event.type === 'mousedown' || event.type === 'touchstart') {
+      activateNote(note);
+    } else if (event.type === 'mouseup' || event.type === 'touchend') {
+      deactivateNote(note);
+    }
+  }
 } 
