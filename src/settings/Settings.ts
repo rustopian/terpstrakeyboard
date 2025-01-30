@@ -43,6 +43,10 @@ export interface Settings {
   showIntervals: boolean;
   showAllNotes: boolean;
   octaveOffset: number;
+  minR: number;
+  maxR: number;
+  minUR: number;
+  maxUR: number;
 }
 
 // Default settings
@@ -87,4 +91,8 @@ export const defaultSettings: Settings = {
   showIntervals: false,
   showAllNotes: false,
   octaveOffset: 0,
+  minR: 0,
+  maxR: 0,
+  minUR: 0,
+  maxUR: 0,
 }; 

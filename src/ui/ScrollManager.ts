@@ -8,6 +8,13 @@ export class ScrollManager {
   private isRedrawing: boolean = false;
   private settings: Settings;
   private scrollArea: HTMLElement;
+  private accumulatedDelta: number = 0;
+  private animationFrameId: number | null = null;
+  private lastDrawTime: number = 0;
+  private readonly FRAME_THROTTLE: number = 1000 / 60; // Target 60fps
+  private cachedCos: number = 1;
+  private cachedSin: number = 0;
+  private lastRotation: number | null = null;
 
   constructor(settings: Settings) {
     this.settings = settings;
@@ -57,7 +64,7 @@ export class ScrollManager {
     const delta = currentX - this.lastX;
     this.lastX = currentX;
     
-    this.updateView(delta);
+    this.queueDeltaUpdate(delta);
     e.preventDefault();
   };
 
@@ -67,7 +74,7 @@ export class ScrollManager {
     const delta = currentX - this.lastX;
     this.lastX = currentX;
     
-    this.updateView(delta);
+    this.queueDeltaUpdate(delta);
     e.preventDefault();
   };
 
@@ -78,7 +85,7 @@ export class ScrollManager {
   private handleWheel = (e: WheelEvent): void => {
     if (e.deltaX !== 0) {
       e.preventDefault();
-      this.updateView(-e.deltaX);
+      this.queueDeltaUpdate(-e.deltaX);
     }
   };
 
@@ -86,29 +93,65 @@ export class ScrollManager {
     e.preventDefault();
   };
 
-  private updateView(delta: number): void {
-    if (this.isRedrawing) return;
+  private updateTrigCache(): void {
+    if (this.lastRotation !== this.settings.rotation) {
+      this.cachedCos = Math.cos(this.settings.rotation);
+      this.cachedSin = Math.sin(this.settings.rotation);
+      this.lastRotation = this.settings.rotation;
+    }
+  }
+
+  private queueDeltaUpdate(delta: number): void {
+    this.accumulatedDelta += delta;
     
-    if (this.settings.centerpoint) {
-      // Transform horizontal screen movement to grid space
-      const angle = this.settings.rotation;
-      const gridDeltaX = delta * Math.cos(angle);    // X component in grid space
-      const gridDeltaY = -delta * Math.sin(angle);   // Y component in grid space (negative to counter rotation)
+    if (this.animationFrameId === null) {
+      this.animationFrameId = requestAnimationFrame(this.updateFrame);
+    }
+  }
+
+  private updateFrame = (): void => {
+    const currentTime = performance.now();
+    const timeSinceLastDraw = currentTime - this.lastDrawTime;
+
+    if (this.accumulatedDelta !== 0 && !this.isRedrawing && this.settings.centerpoint && 
+        timeSinceLastDraw >= this.FRAME_THROTTLE) {
+      this.isRedrawing = true;
+
+      // Update trig cache if rotation changed
+      this.updateTrigCache();
+      
+      // Transform horizontal screen movement to grid space using cached values
+      const gridDeltaX = this.accumulatedDelta * this.cachedCos;
+      const gridDeltaY = -this.accumulatedDelta * this.cachedSin;
       
       // Move in both X and Y to maintain horizontal screen movement
       this.settings.centerpoint.x += gridDeltaX;
       this.settings.centerpoint.y += gridDeltaY;
+
+      // Reset accumulated delta
+      this.accumulatedDelta = 0;
       
-      // Prevent multiple redraws in the same frame
-      this.isRedrawing = true;
-      requestAnimationFrame(() => {
-        drawGrid();
-        this.isRedrawing = false;
-      });
+      // Draw the grid and update last draw time
+      drawGrid();
+      this.lastDrawTime = currentTime;
+      this.isRedrawing = false;
     }
-  }
+
+    // Continue the animation frame loop if still dragging or have accumulated delta
+    if (this.isDragging || this.accumulatedDelta !== 0) {
+      this.animationFrameId = requestAnimationFrame(this.updateFrame);
+    } else {
+      this.animationFrameId = null;
+    }
+  };
 
   public cleanup(): void {
+    // Cancel any pending animation frame
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
     // Remove all event listeners
     this.scrollArea?.removeEventListener('mousedown', this.handleMouseDown);
     document.removeEventListener('mousemove', this.handleMouseMove);

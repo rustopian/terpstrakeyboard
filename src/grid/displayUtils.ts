@@ -1,6 +1,6 @@
 // Display utility functions for the Terpstra Keyboard WebApp
 import { Point } from '../core/geometry';
-import { hexCoordsToScreen, getHexVertices, getOuterHexVertices, hexCoordsToCents } from './hexUtils';
+import { hexCoordsToScreen, getHexVertices, hexCoordsToCents } from './hexUtils';
 import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils';
 import { Settings, CentsResult } from '../core/types';
 
@@ -17,7 +17,13 @@ export function drawHex(coords: Point, color?: string): void {
   // Calculate hex vertices
   const { x, y } = getHexVertices(hexCenter, settings.hexSize);
 
-  // Draw filled hex
+  // Draw filled hex with shadow
+  settings.context.save();
+  settings.context.shadowBlur = 15;
+  settings.context.shadowColor = 'black';
+  settings.context.shadowOffsetX = 0;
+  settings.context.shadowOffsetY = 0;
+
   settings.context.beginPath();
   settings.context.moveTo(x[0], y[0]);
   for (let i = 1; i < 6; i++) {
@@ -26,47 +32,7 @@ export function drawHex(coords: Point, color?: string): void {
   settings.context.closePath();
   settings.context.fillStyle = color || settings.keycolors[coords.x * settings.rSteps + coords.y * settings.urSteps];
   settings.context.fill();
-
-  // Save context and create a hex shaped clip
-  settings.context.save();
-  settings.context.beginPath();
-  settings.context.moveTo(x[0], y[0]);
-  for (let i = 1; i < 6; i++) {
-    settings.context.lineTo(x[i], y[i]);
-  }
-  settings.context.closePath();
-  settings.context.clip();
-
-  // Calculate hex vertices outside clipped path
-  const { x: x2, y: y2 } = getOuterHexVertices(hexCenter, settings.hexSize);
-
-  // Draw shadowed stroke outside clip to create pseudo-3d effect
-  settings.context.beginPath();
-  settings.context.moveTo(x2[0], y2[0]);
-  for (let i = 1; i < 6; i++) {
-    settings.context.lineTo(x2[i], y2[i]);
-  }
-  settings.context.closePath();
-  settings.context.strokeStyle = 'black';
-  settings.context.lineWidth = 5;
-  settings.context.shadowBlur = 15;
-  settings.context.shadowColor = 'black';
-  settings.context.shadowOffsetX = 0;
-  settings.context.shadowOffsetY = 0;
-  settings.context.stroke();
   settings.context.restore();
-
-  // Add a clean stroke around hex
-  settings.context.beginPath();
-  settings.context.moveTo(x[0], y[0]);
-  for (let i = 1; i < 6; i++) {
-    settings.context.lineTo(x[i], y[i]);
-  }
-  settings.context.closePath();
-  settings.context.lineWidth = 2;
-  settings.context.lineJoin = 'round';
-  settings.context.strokeStyle = 'black';
-  settings.context.stroke();
 
   drawHexLabel(coords, hexCenter);
 }
@@ -74,6 +40,13 @@ export function drawHex(coords: Point, color?: string): void {
 function drawHexLabel(p: Point, hexCenter: Point): void {
   // Add note name and equivalence interval multiple
   settings.context.save();
+  
+  // Reset shadow properties for clear text
+  settings.context.shadowBlur = 0;
+  settings.context.shadowColor = 'transparent';
+  settings.context.shadowOffsetX = 0;
+  settings.context.shadowOffsetY = 0;
+  
   settings.context.translate(hexCenter.x, hexCenter.y);
   settings.context.rotate(-settings.rotation);
 
@@ -196,37 +169,18 @@ export function centsToColor(centsObj: CentsResult, isActive: boolean = false): 
 }
 
 export function drawGrid(): void {
-  if (!settings.centerpoint || !settings.hexSize) return;
+  // Clear the entire canvas
+  settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
 
-  // Calculate visible area bounds with generous padding
-  const padding = 20; // More hexes beyond visible area
-  const width = window.innerWidth;
-  const height = window.innerHeight - 50;
-  
-  // Calculate how many hexes fit in view (plus padding)
-  const hexesAcrossHalf = Math.ceil((width / settings.hexWidth)) + padding;
-  const hexesVerticalHalf = Math.ceil((height / settings.hexVert)) + padding;
-  
-  // Calculate grid bounds relative to centerpoint
-  const viewCenterX = settings.centerpoint.x;
-  const viewCenterY = settings.centerpoint.y;
-  
-  // Calculate hex coordinates range with offset based on view center
-  const centerOffsetX = Math.floor(viewCenterX / settings.hexWidth);
-  const centerOffsetY = Math.floor(viewCenterY / settings.hexVert);
-  
-  const minR = -hexesAcrossHalf + centerOffsetX;
-  const maxR = hexesAcrossHalf + centerOffsetX;
-  const minUR = -hexesVerticalHalf + centerOffsetY;
-  const maxUR = hexesVerticalHalf + centerOffsetY;
-  
-  // Draw the grid
-  for (let r = minR; r <= maxR; r++) {
-    for (let ur = minUR; ur <= maxUR; ur++) {
+  // Draw all hexes
+  for (let r = settings.minR; r <= settings.maxR; r++) {
+    for (let ur = settings.minUR; ur <= settings.maxUR; ur++) {
       const coords = new Point(r, ur);
+      const isActive = settings.activeHexObjects?.some(hex => hex.coords.equals(coords)) ?? false;
       const centsObj = hexCoordsToCents(coords);
-      const color = centsToColor(centsObj, false);
-      drawHex(coords, color);
+      drawHex(coords, centsToColor(centsObj, isActive));
     }
   }
-} 
+}
+
+// ... existing code ... 

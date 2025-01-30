@@ -47,36 +47,64 @@ export class SettingsManager {
         const keyboard = document.getElementById("keyboard") as HTMLCanvasElement;
         if (keyboard) {
             keyboard.style.display = "block";
-            keyboard.width = window.innerWidth;
-            keyboard.height = window.innerHeight - 50;
+            
+            // Set display size (css pixels)
             keyboard.style.width = '100%';
             keyboard.style.height = '100%';
             keyboard.style.margin = '0';
-
+            
+            // Set actual size in memory (scaled for retina)
+            const dpr = window.devicePixelRatio || 1;
+            keyboard.width = window.innerWidth * dpr;
+            keyboard.height = (window.innerHeight - 50) * dpr;
+            
             this.settings.canvas = keyboard;
-            this.settings.context = keyboard.getContext('2d')!;
+            this.settings.context = keyboard.getContext('2d', { alpha: false })!;
+            
+            // Scale all drawing operations by the dpr
+            this.settings.context.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
     }
 
     public updateDimensions(): void {
-        const newWidth = window.innerWidth;
-        const newHeight = window.innerHeight - 50;  // Account for scroll area
-
         if (!this.settings.canvas || !this.settings.context) return;
 
-        // Set canvas dimensions
-        this.settings.canvas.width = newWidth;
-        this.settings.canvas.height = newHeight;
+        const dpr = window.devicePixelRatio || 1;
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight - 50;
+
+        // Update canvas size
         this.settings.canvas.style.width = '100%';
         this.settings.canvas.style.height = '100%';
+        this.settings.canvas.width = newWidth * dpr;
+        this.settings.canvas.height = newHeight * dpr;
 
-        // Calculate centerpoint
+        // Reset the transform with the new DPI scale
+        this.settings.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Calculate centerpoint (in CSS pixels)
         this.settings.centerpoint = new Point(newWidth / 2, newHeight / 2);
 
         // Calculate hex dimensions
         this.settings.hexHeight = this.settings.hexSize * 2;
         this.settings.hexVert = this.settings.hexHeight * 3 / 4;
         this.settings.hexWidth = Math.sqrt(3) / 2 * this.settings.hexHeight;
+
+        // Calculate grid boundaries with padding
+        const padding = 10;
+        const hexesAcrossHalf = Math.ceil((newWidth / this.settings.hexWidth)) + padding;
+        const hexesVerticalHalf = Math.ceil((newHeight / this.settings.hexVert)) + padding;
+        
+        const viewCenterX = this.settings.centerpoint.x;
+        const viewCenterY = this.settings.centerpoint.y;
+        
+        const centerOffsetX = Math.floor(viewCenterX / this.settings.hexWidth);
+        const centerOffsetY = Math.floor(viewCenterY / this.settings.hexVert);
+        
+        this.settings.minR = -hexesAcrossHalf + centerOffsetX;
+        this.settings.maxR = hexesAcrossHalf + centerOffsetX;
+        this.settings.minUR = -hexesVerticalHalf + centerOffsetY;
+        this.settings.maxUR = hexesVerticalHalf + centerOffsetY;
 
         // Update rotation matrix
         this.updateRotationMatrix();
@@ -85,16 +113,23 @@ export class SettingsManager {
     public updateRotationMatrix(): void {
         if (!this.settings.context) return;
 
+        const dpr = window.devicePixelRatio || 1;
+
         // Restore previous state if exists
         if (this.settings.rotationMatrix) {
             this.settings.context.restore();
         }
         this.settings.context.save();
 
-        // Calculate and apply new rotation matrix
+        // First apply DPI scaling
+        this.settings.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Then calculate and apply rotation matrix
         this.settings.rotationMatrix = calculateRotationMatrix(-this.settings.rotation, this.settings.centerpoint);
         const m = calculateRotationMatrix(this.settings.rotation, this.settings.centerpoint);
-        this.settings.context.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+        
+        // Combine DPI scaling with rotation matrix
+        this.settings.context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
     }
 
     public loadFromForm(): void {

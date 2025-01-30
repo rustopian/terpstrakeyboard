@@ -70,6 +70,11 @@ export interface Settings {
   showIntervals: boolean;
   showAllNotes: boolean;
   octaveOffset: number;
+  // Grid boundaries
+  minR: number;
+  maxR: number;
+  minUR: number;
+  maxUR: number;
 }
 
 // Instrument interface
