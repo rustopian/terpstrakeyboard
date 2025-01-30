@@ -22,7 +22,7 @@ export function hexCoordsToScreen(hex: Point): Point {
     return new Point(0, 0);
   }
   const screenX = settings.centerpoint.x + hex.x * settings.hexWidth + hex.y * settings.hexWidth / 2;
-  const screenY = settings.centerpoint.y + hex.y * settings.hexVert;
+  const screenY = settings.centerpoint.y + hex.y * (settings.hexVert * 0.995);
   return new Point(screenX, screenY);
 }
 

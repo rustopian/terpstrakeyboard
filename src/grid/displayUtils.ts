@@ -13,25 +13,48 @@ export function initDisplayUtils(appSettings: Settings): void {
 
 export function drawHex(coords: Point, color?: string): void {
   const hexCenter = hexCoordsToScreen(coords);
-
-  // Calculate hex vertices
   const { x, y } = getHexVertices(hexCenter, settings.hexSize);
 
-  // Draw filled hex with shadow
   settings.context.save();
-  settings.context.shadowBlur = 15;
-  settings.context.shadowColor = 'black';
-  settings.context.shadowOffsetX = 0;
-  settings.context.shadowOffsetY = 0;
 
+  // Create clipping path with slightly larger expansion
   settings.context.beginPath();
-  settings.context.moveTo(x[0], y[0]);
-  for (let i = 1; i < 6; i++) {
-    settings.context.lineTo(x[i], y[i]);
+  const expand = 0.75; // Increased expansion for smoother edges
+  for (let i = 0; i < 6; i++) {
+    const curr = i;
+    const next = (i + 1) % 6;
+    const dx = x[next] - x[curr];
+    const dy = y[next] - y[curr];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (i === 0) {
+      settings.context.moveTo(x[curr] + (dx/len) * expand, y[curr] + (dy/len) * expand);
+    }
+    settings.context.lineTo(x[next] + (dx/len) * expand, y[next] + (dy/len) * expand);
   }
   settings.context.closePath();
+  settings.context.clip();
+
+  // Draw the base hex
   settings.context.fillStyle = color || settings.keycolors[coords.x * settings.rSteps + coords.y * settings.urSteps];
   settings.context.fill();
+
+  // Draw shadows on left edges
+  settings.context.globalCompositeOperation = 'source-atop'; // Changed to source-atop for better blending
+  settings.context.lineWidth = 2;
+  settings.context.filter = 'blur(2px)';
+  settings.context.strokeStyle = 'rgba(0, 0, 0, 0.2)'; // Slightly increased opacity
+  
+  // Draw all three left edges in one path
+  settings.context.beginPath();
+  settings.context.moveTo(x[0], y[0]);
+  settings.context.lineTo(x[5], y[5]);
+  settings.context.lineTo(x[4], y[4]);
+  settings.context.lineTo(x[3], y[3]);
+  settings.context.stroke();
+
+  // Reset context
+  settings.context.filter = 'none';
+  settings.context.globalCompositeOperation = 'source-over';
   settings.context.restore();
 
   drawHexLabel(coords, hexCenter);
@@ -169,10 +192,8 @@ export function centsToColor(centsObj: CentsResult, isActive: boolean = false): 
 }
 
 export function drawGrid(): void {
-  // Clear the entire canvas
   settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
-
-  // Draw all hexes
+  
   for (let r = settings.minR; r <= settings.maxR; r++) {
     for (let ur = settings.minUR; ur <= settings.maxUR; ur++) {
       const coords = new Point(r, ur);
@@ -182,5 +203,3 @@ export function drawGrid(): void {
     }
   }
 }
-
-// ... existing code ... 
