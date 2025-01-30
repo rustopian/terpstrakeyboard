@@ -113,6 +113,10 @@ let settings: Settings = {
   showIntervals: false,
   showAllNotes: false,
   octaveOffset: 0,
+  minR: 0,
+  maxR: 0,
+  minUR: 0,
+  maxUR: 0
 };
 
 // Initialize settings manager
