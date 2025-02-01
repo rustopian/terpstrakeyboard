@@ -1,6 +1,7 @@
 import { Point } from '../core/geometry';
 import { ColorVisionType } from '../color/colorTransform';
 import { ActiveHex } from '../audio/activeHex';
+import type { AudioBufferNullable, RotationMatrix } from './SettingsTypes';
 
 export interface Settings {
   scale: number[];
@@ -9,7 +10,7 @@ export interface Settings {
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
   centerpoint: Point;
-  rotationMatrix: [number, number, number, number, number, number];
+  rotationMatrix: RotationMatrix;
   fundamental: number;
   rSteps: number;
   urSteps: number;
@@ -24,7 +25,7 @@ export interface Settings {
   no_labels: boolean;
   spectrum_colors: boolean;
   fundamental_color: string;
-  audioContext?: AudioContext;
+  audioContext: AudioContext | null;
   sustain: boolean;
   sustainedNotes: ActiveHex[];
   activeHexObjects: ActiveHex[];
@@ -36,7 +37,7 @@ export interface Settings {
   audioBuffer?: AudioBuffer;
   activeSources: { [key: number]: { source: AudioBufferSourceNode; gainNode: GainNode } };
   fadeoutTime: number;
-  sampleBuffer: (AudioBuffer | undefined)[];
+  sampleBuffer: AudioBuffer | null;
   colorVisionMode: ColorVisionType;
   colorSaturation: number;
   invert_updown: boolean;
@@ -78,7 +79,7 @@ export const defaultSettings: Settings = {
   no_labels: false,
   spectrum_colors: false,
   fundamental_color: '#55ff55',
-  audioContext: undefined,
+  audioContext: null,
   sustain: false,
   sustainedNotes: [],
   activeHexObjects: [],
@@ -90,7 +91,7 @@ export const defaultSettings: Settings = {
   audioBuffer: undefined,
   activeSources: {},
   fadeoutTime: 0,
-  sampleBuffer: [undefined, undefined, undefined, undefined],
+  sampleBuffer: null,
   colorVisionMode: 'normal',
   colorSaturation: 100,
   invert_updown: false,

@@ -1,13 +1,21 @@
 import { Point } from '../core/geometry';
 import { calculateRotationMatrix } from '../core/geometry';
-import { transformColorsForCVD, transformColorForCVD, ColorVisionType } from '../color/colorTransform';
+import type { ColorVisionType } from '../color/colorTransform';
+import { transformColorsForCVD, transformColorForCVD } from '../color/colorTransform';
 import { hex2rgb, adjustColorSaturation } from '../color/colorUtils';
 import { drawGrid } from '../grid/displayUtils';
 import { defaultSettings } from './Settings';
-import { Settings } from './Settings';
-import { EventHandlerSettings, AudioSettings, DisplaySettings, GridSettings } from './SettingsTypes';
+import type { Settings } from './Settings';
+import type {
+    EventHandlerSettings,
+    AudioSettings,
+    DisplaySettings,
+    GridSettings,
+} from './SettingsTypes';
 
-// Add interface for preset structure
+/**
+ * Structure for a preset configuration
+ */
 interface Preset {
     label: string;
     parameters: {
@@ -32,6 +40,10 @@ interface PresetGroups {
     [key: string]: Preset[];
 }
 
+/**
+ * Manages application settings and provides typed access to settings for different modules.
+ * Handles initialization, updates, and persistence of settings.
+ */
 export class SettingsManager {
     private settings: Settings;
     private presets: PresetGroups = {};
@@ -65,6 +77,11 @@ export class SettingsManager {
             rotationMatrix: this.settings.rotationMatrix,
             hexWidth: this.settings.hexWidth,
             hexVert: this.settings.hexVert,
+            scale: this.settings.scale,
+            equivInterval: this.settings.equivInterval,
+            audioContext: this.settings.audioContext ?? null,
+            midi_enabled: this.settings.midi_enabled,
+            sampleBuffer: this.settings.sampleBuffer,
             pressedKeys: [],
             isMouseDown: false,
             isTouchDown: false,
@@ -86,7 +103,7 @@ export class SettingsManager {
             octaveOffset: this.settings.octaveOffset,
             sustain: this.settings.sustain,
             sustainedNotes: this.settings.sustainedNotes,
-            audioContext: this.settings.audioContext,
+            audioContext: this.settings.audioContext ?? null,
             midi_enabled: this.settings.midi_enabled,
             sampleBuffer: this.settings.sampleBuffer,
             fadeoutTime: this.settings.fadeoutTime
@@ -116,7 +133,19 @@ export class SettingsManager {
             hexVert: this.settings.hexVert,
             keycolors: this.settings.keycolors,
             useKeyImage: this.settings.useKeyImage,
-            keyImage: this.settings.keyImage
+            keyImage: this.settings.keyImage,
+            rSteps: this.settings.rSteps,
+            urSteps: this.settings.urSteps,
+            scale: this.settings.scale,
+            octaveOffset: this.settings.octaveOffset,
+            invert_updown: this.settings.invert_updown,
+            spectrum_colors: this.settings.spectrum_colors,
+            fundamental_color: this.settings.fundamental_color,
+            activeHexObjects: this.settings.activeHexObjects,
+            minR: this.settings.minR,
+            maxR: this.settings.maxR,
+            minUR: this.settings.minUR,
+            maxUR: this.settings.maxUR
         };
     }
 
@@ -136,7 +165,12 @@ export class SettingsManager {
             hexVert: this.settings.hexVert,
             scale: this.settings.scale,
             equivInterval: this.settings.equivInterval,
-            octaveOffset: this.settings.octaveOffset
+            octaveOffset: this.settings.octaveOffset,
+            minR: this.settings.minR,
+            maxR: this.settings.maxR,
+            minUR: this.settings.minUR,
+            maxUR: this.settings.maxUR,
+            fundamental: this.settings.fundamental
         };
     }
 

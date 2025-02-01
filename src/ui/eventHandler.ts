@@ -4,6 +4,8 @@ import { Point, applyMatrixToPoint } from '../core/geometry';
 import { centsToColor, drawHex } from '../grid/displayUtils';
 import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote, activateNote, deactivateNote, isNoteActive, releaseAllNotes } from '../audio/activeHex';
 import { getMidiFromCoords } from '../audio/audioHandler';
+import type { Settings } from '../settings/Settings';
+import type { AudioSettings } from '../settings/SettingsTypes';
 
 // Extend ActiveHex type to include touchId
 interface TouchActiveHex extends ActiveHex {
@@ -31,31 +33,7 @@ interface KeyboardState {
   isSustainOn: boolean;
 }
 
-/**
- * Configuration settings for the keyboard.
- * Contains only non-transient settings that define keyboard behavior.
- * These settings should not change during normal operation.
- * 
- * @property canvas - The rendering canvas
- * @property keyCodeToCoords - Mapping of keyboard keys to grid coordinates
- * @property rSteps - Right-facing steps in the grid
- * @property urSteps - Up-right facing steps in the grid
- * @property fundamental - Base frequency for note calculation
- * @property octaveOffset - Octave shift from middle C
- * @property toggle_mode - Whether notes stay on when key is released
- */
-interface Settings {
-  canvas: HTMLCanvasElement;
-  keyCodeToCoords: { [key: number]: Point };
-  rSteps: number;
-  urSteps: number;
-  fundamental: number;
-  octaveOffset: number;
-  toggle_mode: boolean;
-  [key: string]: any; // For any additional settings
-}
-
-let settings: Settings | undefined;
+let settings: Settings;
 let state: KeyboardState = {
   activeHexObjects: [],
   pressedKeys: [],
@@ -87,7 +65,7 @@ export function initEventHandlers(appSettings: Settings): void {
     }
   }
 
-  initActiveHex(appSettings, midiOutput);
+  initActiveHex(appSettings as AudioSettings, midiOutput);
   setupKeyboardEvents();
   setupTouchEvents();
   setupMouseEvents();

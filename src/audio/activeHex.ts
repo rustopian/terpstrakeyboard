@@ -1,10 +1,7 @@
 import { playNote, stopNote, getMidiFromCoords } from './audioHandler';
-import { Point } from '../core/geometry';
+import type { Point } from '../core/geometry';
 import { updateChordDisplay } from './chordRecognition';
-import { centsToColor } from '../grid/displayUtils';
-import { drawHex } from '../grid/displayUtils';
-import { hexCoordsToCents } from '../grid/hexUtils';
-import { AudioSettings } from '../settings/SettingsTypes';
+import type { AudioSettings } from '../settings/SettingsTypes';
 
 declare global {
   interface WebMidiOutput {
