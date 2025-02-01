@@ -17,13 +17,11 @@ declare global {
 }
 
 interface Settings {
-  sustain: boolean;
-  sustainedNotes: ActiveHex[];
   rSteps: number;
   urSteps: number;
   fundamental: number;
   octaveOffset: number;
-  activeHexObjects: ActiveHex[];
+  [key: string]: any; // For any additional settings
 }
 
 interface AudioResult {
@@ -37,6 +35,9 @@ let myOutput: WebMidiOutput | null = null;
 // Track both held and toggled notes
 const activeNotes = new Set<number>();
 const toggledNotes = new Set<number>();
+
+// Track active audio nodes
+const activeAudioNodes = new Set<{gainNode: GainNode | null, source: AudioBufferSourceNode | null}>();
 
 export function initActiveHex(appSettings: Settings, output: WebMidiOutput | null): void {
   settings = appSettings;
@@ -90,6 +91,8 @@ export class ActiveHex {
     if (result) {
       this.source = result.source;
       this.gainNode = result.gainNode;
+      // Track the audio nodes
+      activeAudioNodes.add({gainNode: this.gainNode, source: this.source});
     }
   }
 
@@ -99,15 +102,16 @@ export class ActiveHex {
       return;
     }
 
-    if (settings.sustain && settings.sustainedNotes) {
-      settings.sustainedNotes.push(this);
-    } else {
-      if (myOutput) {
-        myOutput.stopNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps, settings.octaveOffset), [channel]);
-        return;
-      }
-      stopNote(this.gainNode, this.source);
+    if (myOutput) {
+      myOutput.stopNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps, settings.octaveOffset), [channel]);
+      return;
     }
+    
+    // Remove from active nodes before stopping
+    if (this.gainNode || this.source) {
+      activeAudioNodes.delete({gainNode: this.gainNode, source: this.source});
+    }
+    stopNote(this.gainNode, this.source);
   }
 }
 
@@ -124,27 +128,23 @@ export function removeActiveNote(hex: ActiveHex): void {
 export function releaseAllNotes(): void {
   if (!settings) return;
 
-  // Release all active hex objects
-  if (settings.activeHexObjects) {
-    for (const hex of settings.activeHexObjects) {
-      hex.noteOff();
-      const coords = hex.coords;
-      drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+  // If using MIDI output, send all notes off
+  if (myOutput) {
+    // Send note off for all possible MIDI notes (0-127)
+    for (const note of activeNotes) {
+      myOutput.stopNote(note, [1]);
     }
-    settings.activeHexObjects = [];
   }
+
+  // Stop all active audio nodes
+  for (const nodes of activeAudioNodes) {
+    stopNote(nodes.gainNode, nodes.source);
+  }
+  activeAudioNodes.clear();
 
   // Clear all note tracking sets
   activeNotes.clear();
   toggledNotes.clear();
-
-  // Clear any sustained notes
-  if (settings.sustainedNotes) {
-    for (const note of settings.sustainedNotes) {
-      note.noteOff();
-    }
-    settings.sustainedNotes = [];
-  }
 
   // Update the chord display
   updateChordDisplay([]);
