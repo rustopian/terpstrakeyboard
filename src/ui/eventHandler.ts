@@ -68,7 +68,7 @@ export function initEventHandlers(appSettings: unknown): void {
     }
   }
 
-  initActiveHex(appSettings, midiOutput);
+  initActiveHex(appSettings);
   setupKeyboardEvents();
   setupTouchEvents();
   setupMouseEvents();
@@ -273,7 +273,7 @@ function handleNote(coords: Point, isActive: boolean, touchId?: number): ActiveH
     state.activeHexObjects.push(hex);
     addActiveNote(hex);
     const centsObj = hexCoordsToCents(coords);
-    hex.noteOn(centsObj);
+    hex.noteOn();
     drawHex(coords, centsToColor(centsObj, true));
     return hex;
   } else {
@@ -573,7 +573,8 @@ export function handleHexClick(event: MouseEvent | TouchEvent, hexCoords: { x: n
   const settings = (window as any).settings;
   if (!settings) return;
 
-  const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+  const point = new Point(hexCoords.x, hexCoords.y);
+  const note = getMidiFromCoords(point, settings.rSteps, settings.urSteps, settings.octaveOffset);
   
   if (settings.toggle_mode) {
     // In toggle mode, just toggle the note

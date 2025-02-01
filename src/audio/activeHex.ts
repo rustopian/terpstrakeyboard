@@ -27,20 +27,9 @@ export class ActiveHex {
     this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
   }
 
-  async noteOn(centsObj: number | { cents: number; reducedSteps: number }, channel: number = 1): Promise<void> {
+  async noteOn(): Promise<void> {
     if (!settings) {
       console.warn('Settings not initialized for ActiveHex');
-      return;
-    }
-
-    const centsValue = typeof centsObj === 'object' 
-      ? parseFloat(centsObj.cents.toString()) 
-      : typeof centsObj === 'number' 
-        ? centsObj 
-        : parseFloat(centsObj);
-        
-    if (isNaN(centsValue)) {
-      console.warn('Invalid cents value:', centsObj);
       return;
     }
 
@@ -54,7 +43,7 @@ export class ActiveHex {
     addActiveNote(this);
   }
 
-  async noteOff(channel: number = 1): Promise<void> {
+  async noteOff(): Promise<void> {
     if (!settings) {
       console.warn('Settings not initialized for ActiveHex');
       return;
