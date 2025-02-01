@@ -1,5 +1,5 @@
 // Import audio functions
-import { initAudio, loadInstrumentSamples } from './audio/audioHandler';
+import { initAudio, initAudioHandler, loadInstrumentSamples } from './audio/audioHandler';
 
 // Import event handling functions
 import { initEventHandlers } from './ui/eventHandler';
@@ -82,15 +82,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize display utilities
     initDisplayUtils(settings);
     
+    // Initialize audio handler with settings first
+    initAudioHandler(settings);
+    
     // Initialize event handlers
     initEventHandlers(settings);
-    
-    // Initialize audio system
-    const ctx = await initAudio();
-    if (ctx) {
-        settings.audioContext = ctx;
-        console.log("[DEBUG] Audio context initialized:", ctx.state);
-    }
     
     // Add settings button handler
     document.getElementById('settings-button')?.addEventListener('click', showSettings);
@@ -101,12 +97,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             hideSettings();
         }
     });
-
-    // Load instrument samples
-    const instrumentSelect = document.getElementById('instrument') as HTMLSelectElement;
-    if (instrumentSelect) {
-        await loadInstrumentSamples();
-    }
 
     // Initialize scroll area
     initScrollArea();
@@ -124,8 +114,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (landingPage) landingPage.style.display = "none";
         if (settingsButton) settingsButton.style.display = "block";
         
-        if (instrumentSelect) {
-            instrumentSelect.value = getData.instrument ?? "organ";
+        // Initialize audio system after UI is ready
+        const ctx = await initAudio();
+        if (ctx) {
+            settings.audioContext = ctx;
+            console.log("[DEBUG] Audio context initialized:", ctx.state);
+            
+            // Resume the audio context since it might be suspended
+            try {
+                await ctx.resume();
+                console.log("[DEBUG] Audio context resumed:", ctx.state);
+                
+                // Load instrument samples only after audio context is ready
+                const instrumentSelect = document.getElementById('instrument') as HTMLSelectElement;
+                if (instrumentSelect) {
+                    instrumentSelect.value = getData.instrument ?? "organ";
+                    await loadInstrumentSamples();
+                }
+            } catch (error) {
+                console.error("[DEBUG] Error resuming audio context:", error);
+            }
         }
         
         settingsManager.checkPreset(16);

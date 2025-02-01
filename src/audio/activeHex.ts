@@ -1,62 +1,35 @@
-import { playNote, stopNote, getMidiFromCoords } from './audioHandler';
-import type { Point } from '../core/geometry';
+import { Point } from '../core/geometry';
+import { hexCoordsToCents } from '../grid/hexUtils';
 import { updateChordDisplay } from './chordRecognition';
 import type { AudioSettings } from '../settings/SettingsTypes';
-
-declare global {
-  interface WebMidiOutput {
-    playNote: (note: number, channels: number[]) => void;
-    stopNote: (note: number, channels: number[]) => void;
-  }
-  interface WebMidi {
-    Output: WebMidiOutput;
-  }
-  var WebMidi: WebMidi;
-}
-
-interface AudioResult {
-  source: AudioBufferSourceNode;
-  gainNode: GainNode;
-}
+import { noteEventManager } from './NoteEventManager';
+import { getMidiFromCoords } from './audioHandler';
 
 let settings: AudioSettings | undefined;
-let myOutput: WebMidiOutput | null = null;
 
-// Track both held and toggled notes
-const activeNotes = new Set<number>();
-const toggledNotes = new Set<number>();
-
-// Track active audio nodes
-const activeAudioNodes = new Set<{gainNode: GainNode | null, source: AudioBufferSourceNode | null}>();
-
-export function initActiveHex(appSettings: AudioSettings, output: WebMidiOutput | null): void {
+export function initActiveHex(appSettings: AudioSettings): void {
   settings = appSettings;
-  myOutput = output;
 }
 
 export class ActiveHex {
   coords: Point;
-  release: boolean;
-  freq: number;
-  source: AudioBufferSourceNode | null;
-  gainNode: GainNode | null;
+  frequency: number;
+  midiNote: number;
+  nodeId?: string;
 
   constructor(coords: Point) {
+    if (!settings) {
+      throw new Error('Settings not initialized for ActiveHex');
+    }
     this.coords = coords;
-    this.release = false;
-    this.freq = 440;
-    this.source = null;
-    this.gainNode = null;
+    const centsObj = hexCoordsToCents(coords);
+    this.frequency = settings.fundamental * Math.pow(2, centsObj.cents / 1200);
+    this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
   }
 
-  noteOn(centsObj: number | { cents: number; reducedSteps: number }, channel: number = 1): void {
+  async noteOn(centsObj: number | { cents: number; reducedSteps: number }, channel: number = 1): Promise<void> {
     if (!settings) {
       console.warn('Settings not initialized for ActiveHex');
-      return;
-    }
-
-    if (myOutput) {
-      myOutput.playNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps, settings.octaveOffset), [channel]);
       return;
     }
 
@@ -71,72 +44,71 @@ export class ActiveHex {
       return;
     }
 
-    const freq = parseFloat(settings.fundamental.toString()) * Math.pow(2, centsValue / 1200);
-    if (!isFinite(freq)) {
-      console.warn('Invalid frequency calculated:', freq, 'using fundamental:', settings.fundamental, 'cents:', centsValue);
-      return;
-    }
+    await noteEventManager.handleNoteEvent({
+      type: 'noteOn',
+      coords: this.coords,
+      frequency: this.frequency,
+      midiNote: this.midiNote
+    });
 
-    const result = playNote(freq) as AudioResult | null;
-    if (result) {
-      this.source = result.source;
-      this.gainNode = result.gainNode;
-      // Track the audio nodes
-      activeAudioNodes.add({gainNode: this.gainNode, source: this.source});
-    }
+    addActiveNote(this);
   }
 
-  noteOff(channel: number = 1): void {
+  async noteOff(channel: number = 1): Promise<void> {
     if (!settings) {
       console.warn('Settings not initialized for ActiveHex');
       return;
     }
 
-    if (myOutput) {
-      myOutput.stopNote(getMidiFromCoords(this.coords, settings.rSteps, settings.urSteps, settings.octaveOffset), [channel]);
-      return;
-    }
-    
-    // Remove from active nodes before stopping
-    if (this.gainNode || this.source) {
-      activeAudioNodes.delete({gainNode: this.gainNode, source: this.source});
-    }
-    stopNote(this.gainNode, this.source);
+    await noteEventManager.handleNoteEvent({
+      type: 'noteOff',
+      coords: this.coords,
+      frequency: this.frequency,
+      midiNote: this.midiNote,
+      nodeId: this.nodeId
+    });
+
+    removeActiveNote(this);
   }
 }
 
+// Track both held and toggled notes
+const activeNotes = new Set<number>();
+const toggledNotes = new Set<number>();
+
 export function addActiveNote(hex: ActiveHex): void {
-  activeNotes.add(getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset));
+  if (!settings) return;
+  activeNotes.add(hex.midiNote);
   updateChordDisplay(getActiveNotes());
 }
 
 export function removeActiveNote(hex: ActiveHex): void {
-  activeNotes.delete(getMidiFromCoords(hex.coords, settings!.rSteps, settings!.urSteps, settings!.octaveOffset));
+  if (!settings) return;
+  activeNotes.delete(hex.midiNote);
   updateChordDisplay(getActiveNotes());
 }
 
 export function releaseAllNotes(): void {
   if (!settings) return;
-
-  // If using MIDI output, send all notes off
-  if (myOutput) {
-    // Send note off for all possible MIDI notes (0-127)
-    for (const note of activeNotes) {
-      myOutput.stopNote(note, [1]);
+  
+  // Release all notes through the note event manager
+  for (const note of activeNotes) {
+    const coords = getMidiCoords(note);
+    if (coords) {
+      noteEventManager.handleNoteEvent({
+        type: 'noteOff',
+        coords,
+        frequency: getFrequencyForNote(note),
+        midiNote: note
+      });
     }
   }
 
-  // Stop all active audio nodes
-  for (const nodes of activeAudioNodes) {
-    stopNote(nodes.gainNode, nodes.source);
-  }
-  activeAudioNodes.clear();
-
-  // Clear all note tracking sets
+  // Clear tracking sets
   activeNotes.clear();
   toggledNotes.clear();
-
-  // Update the chord display
+  
+  // Update chord display
   updateChordDisplay([]);
 }
 
@@ -145,38 +117,48 @@ export function isNoteActive(note: number): boolean {
 }
 
 export function getActiveNotes(): number[] {
-  // Combine held and toggled notes
   return Array.from(new Set([...activeNotes, ...toggledNotes]));
 }
 
 export function activateNote(note: number): void {
   const settings = (window as any).settings;
   if (settings.toggle_mode) {
-    // In toggle mode, clicking toggles the note on/off
     if (toggledNotes.has(note)) {
       toggledNotes.delete(note);
     } else {
       toggledNotes.add(note);
     }
   } else {
-    // Normal mode - just add to active notes
     activeNotes.add(note);
   }
   updateChordDisplay(getActiveNotes());
 }
 
 export function deactivateNote(note: number): void {
-  // Only remove from activeNotes, not toggledNotes
   activeNotes.delete(note);
   updateChordDisplay(getActiveNotes());
+}
+
+// Helper functions
+function getMidiCoords(midiNote: number): Point | null {
+  if (!settings) return null;
+  const octave = Math.floor((midiNote - 60) / 12);
+  const remainder = (midiNote - 60) % 12;
+  return new Point(
+    Math.floor(remainder / settings.rSteps),
+    Math.floor(remainder / settings.urSteps)
+  );
+}
+
+function getFrequencyForNote(midiNote: number): number {
+  if (!settings) return 440;
+  return settings.fundamental * Math.pow(2, (midiNote - 69) / 12);
 }
 
 // Initialize release all button handler
 document.addEventListener('DOMContentLoaded', () => {
   const releaseAllButton = document.getElementById('release-all');
   if (releaseAllButton) {
-    releaseAllButton.addEventListener('click', () => {
-      releaseAllNotes();
-    });
+    releaseAllButton.addEventListener('click', releaseAllNotes);
   }
 }); 

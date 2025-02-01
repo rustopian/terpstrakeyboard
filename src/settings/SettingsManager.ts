@@ -12,6 +12,12 @@ import type {
     DisplaySettings,
     GridSettings,
 } from './SettingsTypes';
+import {
+    hasEventHandlerProps,
+    hasAudioProps,
+    hasDisplayProps,
+    hasGridProps
+} from './SettingsTypes';
 
 /**
  * Structure for a preset configuration
@@ -63,115 +69,49 @@ export class SettingsManager {
     /**
      * Gets settings required for event handling.
      * Used by the event handling system for input processing.
+     * @throws Error if required properties are missing
      */
     public getEventHandlerSettings(): EventHandlerSettings {
-        return {
-            canvas: this.settings.canvas,
-            keyCodeToCoords: this.settings.keyCodeToCoords,
-            rSteps: this.settings.rSteps,
-            urSteps: this.settings.urSteps,
-            fundamental: this.settings.fundamental,
-            octaveOffset: this.settings.octaveOffset,
-            toggle_mode: this.settings.toggle_mode,
-            hexSize: this.settings.hexSize,
-            rotationMatrix: this.settings.rotationMatrix,
-            hexWidth: this.settings.hexWidth,
-            hexVert: this.settings.hexVert,
-            scale: this.settings.scale,
-            equivInterval: this.settings.equivInterval,
-            audioContext: this.settings.audioContext ?? null,
-            midi_enabled: this.settings.midi_enabled,
-            sampleBuffer: this.settings.sampleBuffer,
-            pressedKeys: [],
-            isMouseDown: false,
-            isTouchDown: false,
-            activeHexObjects: [],
-            sustainedNotes: [],
-            sustain: false
-        };
+        if (!hasEventHandlerProps(this.settings)) {
+            throw new Error('Settings missing required event handler properties');
+        }
+        return this.settings;
     }
 
     /**
      * Gets settings required for audio processing.
      * Used by the audio system for sound generation and MIDI.
+     * @throws Error if required properties are missing
      */
     public getAudioSettings(): AudioSettings {
-        return {
-            rSteps: this.settings.rSteps,
-            urSteps: this.settings.urSteps,
-            fundamental: this.settings.fundamental,
-            octaveOffset: this.settings.octaveOffset,
-            sustain: this.settings.sustain,
-            sustainedNotes: this.settings.sustainedNotes,
-            audioContext: this.settings.audioContext ?? null,
-            midi_enabled: this.settings.midi_enabled,
-            sampleBuffer: this.settings.sampleBuffer,
-            fadeoutTime: this.settings.fadeoutTime
-        };
+        if (!hasAudioProps(this.settings)) {
+            throw new Error('Settings missing required audio properties');
+        }
+        return this.settings;
     }
 
     /**
      * Gets settings required for display rendering.
      * Used by the display system for visual output.
+     * @throws Error if required properties are missing
      */
     public getDisplaySettings(): DisplaySettings {
-        return {
-            canvas: this.settings.canvas,
-            context: this.settings.context,
-            hexSize: this.settings.hexSize,
-            rotation: this.settings.rotation,
-            colorVisionMode: this.settings.colorVisionMode,
-            colorSaturation: this.settings.colorSaturation,
-            textSize: this.settings.textSize,
-            no_labels: this.settings.no_labels,
-            names: this.settings.names,
-            enum: this.settings.enum,
-            equivSteps: this.settings.equivSteps,
-            rotationMatrix: this.settings.rotationMatrix,
-            centerpoint: this.settings.centerpoint,
-            hexWidth: this.settings.hexWidth,
-            hexVert: this.settings.hexVert,
-            keycolors: this.settings.keycolors,
-            useKeyImage: this.settings.useKeyImage,
-            keyImage: this.settings.keyImage,
-            rSteps: this.settings.rSteps,
-            urSteps: this.settings.urSteps,
-            scale: this.settings.scale,
-            octaveOffset: this.settings.octaveOffset,
-            invert_updown: this.settings.invert_updown,
-            spectrum_colors: this.settings.spectrum_colors,
-            fundamental_color: this.settings.fundamental_color,
-            activeHexObjects: this.settings.activeHexObjects,
-            minR: this.settings.minR,
-            maxR: this.settings.maxR,
-            minUR: this.settings.minUR,
-            maxUR: this.settings.maxUR
-        };
+        if (!hasDisplayProps(this.settings)) {
+            throw new Error('Settings missing required display properties');
+        }
+        return this.settings;
     }
 
     /**
      * Gets settings required for grid calculations.
      * Used by the grid system for coordinate handling.
+     * @throws Error if required properties are missing
      */
     public getGridSettings(): GridSettings {
-        return {
-            rSteps: this.settings.rSteps,
-            urSteps: this.settings.urSteps,
-            hexSize: this.settings.hexSize,
-            rotation: this.settings.rotation,
-            rotationMatrix: this.settings.rotationMatrix,
-            centerpoint: this.settings.centerpoint,
-            hexWidth: this.settings.hexWidth,
-            hexVert: this.settings.hexVert,
-            scale: this.settings.scale,
-            equivInterval: this.settings.equivInterval,
-            octaveOffset: this.settings.octaveOffset,
-            minR: this.settings.minR,
-            maxR: this.settings.maxR,
-            minUR: this.settings.minUR,
-            maxUR: this.settings.maxUR,
-            fundamental: this.settings.fundamental
-        };
+        if (!hasGridProps(this.settings)) {
+            throw new Error('Settings missing required grid properties');
+        }
+        return this.settings;
     }
 
     public initializeCanvas(): void {

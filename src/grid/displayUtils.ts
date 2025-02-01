@@ -3,12 +3,16 @@ import { Point } from '../core/geometry';
 import { hexCoordsToScreen, getHexVertices, hexCoordsToCents } from './hexUtils';
 import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils';
 import { CentsResult } from '../core/types';
-import { DisplaySettings } from '../settings/SettingsTypes';
+import type { DisplaySettings } from '../settings/SettingsTypes';
+import { hasDisplayProps } from '../settings/SettingsTypes';
 
 let settings: DisplaySettings;
 export let current_text_color = "#000000";
 
-export function initDisplayUtils(displaySettings: DisplaySettings): void {
+export function initDisplayUtils(displaySettings: unknown): void {
+  if (!hasDisplayProps(displaySettings)) {
+    throw new Error('Missing required display properties');
+  }
   settings = displaySettings;
 }
 

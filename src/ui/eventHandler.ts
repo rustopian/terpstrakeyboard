@@ -1,11 +1,11 @@
 // Event handling functions for the Terpstra Keyboard WebApp
 import { hexCoordsToCents, getHexCoordsAt } from '../grid/hexUtils';
-import { Point, applyMatrixToPoint } from '../core/geometry';
+import { Point } from '../core/geometry';
 import { centsToColor, drawHex } from '../grid/displayUtils';
 import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote, activateNote, deactivateNote, isNoteActive, releaseAllNotes } from '../audio/activeHex';
 import { getMidiFromCoords } from '../audio/audioHandler';
-import type { Settings } from '../settings/Settings';
-import type { AudioSettings } from '../settings/SettingsTypes';
+import type { EventHandlerSettings } from '../settings/SettingsTypes';
+import { hasEventHandlerProps } from '../settings/SettingsTypes';
 
 // Extend ActiveHex type to include touchId
 interface TouchActiveHex extends ActiveHex {
@@ -33,7 +33,7 @@ interface KeyboardState {
   isSustainOn: boolean;
 }
 
-let settings: Settings;
+let settings: EventHandlerSettings;
 let state: KeyboardState = {
   activeHexObjects: [],
   pressedKeys: [],
@@ -49,7 +49,10 @@ let is_key_event_added: number | undefined;
  * This is the main entry point for setting up user interaction.
  * @param appSettings - The application settings object containing canvas and audio configuration
  */
-export function initEventHandlers(appSettings: Settings): void {
+export function initEventHandlers(appSettings: unknown): void {
+  if (!hasEventHandlerProps(appSettings)) {
+    throw new Error('Missing required event handler properties');
+  }
   settings = appSettings;
   
   // Get MIDI output if MIDI is enabled and an output is selected
@@ -65,7 +68,7 @@ export function initEventHandlers(appSettings: Settings): void {
     }
   }
 
-  initActiveHex(appSettings as AudioSettings, midiOutput);
+  initActiveHex(appSettings, midiOutput);
   setupKeyboardEvents();
   setupTouchEvents();
   setupMouseEvents();
@@ -108,7 +111,7 @@ function setupKeyboardEvents(): void {
   if (typeof(is_key_event_added) === 'undefined') {
     is_key_event_added = 1;
     if (!settings) {
-      settings = {} as Settings;
+      settings = {} as EventHandlerSettings;
     }
     settings.pressedKeys = [];
     settings.keyCodeToCoords = {
@@ -164,45 +167,6 @@ function setupKeyboardEvents(): void {
     window.addEventListener("keydown", onKeyDown, false);
     window.addEventListener("keyup", onKeyUp, false);
   }
-}
-
-/**
- * Converts hex grid coordinates to screen coordinates.
- * Takes into account:
- * - Canvas position and dimensions
- * - Grid rotation
- * - Hex geometry (width, height, vertical spacing)
- * - DPI scaling (handled by canvas transform)
- * 
- * @param hexCoords - The hex grid coordinates to convert
- * @returns Screen coordinates relative to the canvas
- */
-function hexCoordsToScreen(hexCoords: Point): Point {
-  if (!settings?.canvas) {
-    console.warn('Canvas not initialized');
-    return new Point(0, 0);
-  }
-  
-  // Convert hex coordinates to screen coordinates
-  const screenPoint = settings.canvas.getBoundingClientRect();
-  const centerX = screenPoint.width / 2;
-  const centerY = screenPoint.height / 2;
-  
-  if (!settings.hexSize || !settings.rotationMatrix) {
-    console.warn('Settings not fully initialized');
-    return new Point(centerX, centerY);
-  }
-
-  // Calculate the actual position using hex grid geometry
-  const x = hexCoords.x * settings.hexWidth * 3/4;
-  const y = hexCoords.y * settings.hexVert;
-  
-  // Apply rotation and translation
-  const rotated = applyMatrixToPoint(settings.rotationMatrix, new Point(x, y));
-  return new Point(
-    rotated.x + centerX,
-    rotated.y + centerY
-  );
 }
 
 /**
@@ -282,18 +246,6 @@ function onKeyUp(e: KeyboardEvent): void {
 }
 
 /**
- * Interface for note activation/deactivation actions.
- * Used to standardize note interaction across different input methods.
- * 
- * @property coords - The grid coordinates where the action occurs
- * @property isActive - The desired state of the note (true = on, false = off)
- */
-interface NoteAction {
-  coords: Point;
-  isActive: boolean;
-}
-
-/**
  * Centralized function for activating/deactivating notes.
  * This is the core function for all note interactions in the keyboard.
  * 
@@ -339,23 +291,6 @@ function handleNote(coords: Point, isActive: boolean, touchId?: number): ActiveH
     }
   }
   return null;
-}
-
-/**
- * Handles note activation/deactivation from coordinates.
- * This is a wrapper around handleNote that provides backward compatibility
- * and simpler interface for basic note actions.
- * 
- * Used primarily by:
- * - Toggle mode interactions
- * - Initial note activation
- * - External note triggers
- * 
- * @param action - Object containing coordinates and desired note state
- */
-function handleNoteAction(action: NoteAction): void {
-  if (!settings) return;
-  handleNote(action.coords, action.isActive);
 }
 
 /**

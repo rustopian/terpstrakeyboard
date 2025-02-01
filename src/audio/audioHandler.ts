@@ -1,4 +1,10 @@
 import { Instrument } from '../core/types';
+import type { AudioRequired } from '../settings/SettingsTypes';
+import { hasAudioProps } from '../settings/SettingsTypes';
+import { audioNodeManager } from './AudioNodeManager';
+import { sampleManager } from './SampleManager';
+import { noteEventManager } from './NoteEventManager';
+import { Point } from '../core/geometry';
 
 export const instruments: Instrument[] = [
   { fileName: "piano", fade: 0.1 },
@@ -26,240 +32,117 @@ export const instruments: Instrument[] = [
   { fileName: "WMRI-in7-har6-", fade: 0.1 }
 ];
 
-let audioContext: AudioContext | undefined;
-let sampleBuffer: (AudioBuffer | undefined)[] = [undefined, undefined, undefined, undefined];
-let sampleFadeout: number;
-let debugLoading = true;
+let settings: AudioRequired;
 
-declare global {
-  interface Window {
-    webkitAudioContext: typeof AudioContext;
+export function initAudioHandler(appSettings: unknown): void {
+  if (!hasAudioProps(appSettings)) {
+    throw new Error('Missing required audio properties');
   }
+  settings = appSettings;
 }
 
 export function initAudio(): AudioContext | null {
   try {
-    window.AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!audioContext) {
-      audioContext = new AudioContext();
-      if (debugLoading) console.log("Audio context created:", audioContext.state);
-    } else if (debugLoading) {
-      console.log("Using existing audio context:", audioContext.state);
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor) {
+      console.error('AudioContext not supported in this browser');
+      return null;
     }
-    return audioContext;
+
+    const ctx = new AudioContextConstructor();
+    if (ctx.state === 'suspended') {
+      console.log("[DEBUG] AudioContext created in suspended state - waiting for user interaction");
+    }
+    return ctx;
   } catch (e) {
-    alert('Web Audio API is not supported in this browser');
+    console.error('Web Audio API error:', e);
     return null;
-  }
-}
-
-export function loadSample(name: string, iteration: number): void {
-  if (!audioContext) {
-    console.error("No audio context available for loading sample");
-    return;
-  }
-
-  const sampleFreqs = ["110", "220", "440", "880"];
-  const url = `/sounds/${name}${sampleFreqs[iteration]}.mp3`;
-  
-  console.log(`[DEBUG] Starting to load sample: ${url}`);
-  console.log(`[DEBUG] Current sample buffer status:`, 
-    sampleBuffer.map((buf, i) => `${i}: ${buf ? 'loaded' : 'empty'}`));
-  
-  const request = new XMLHttpRequest();
-  request.open('GET', url, true);
-  request.responseType = 'arraybuffer';
-
-  request.onload = function() {
-    console.log(`[DEBUG] XMLHttpRequest complete for ${url}:`);
-    console.log(`[DEBUG] - Status: ${request.status}`);
-    console.log(`[DEBUG] - Response type: ${request.response?.constructor.name}`);
-    console.log(`[DEBUG] - Response size: ${request.response?.byteLength} bytes`);
-    
-    if (request.status === 200) {
-      console.log(`[DEBUG] Sample loaded from ${url}, decoding...`);
-      audioContext?.decodeAudioData(request.response, 
-        function(buffer) {
-          console.log(`[DEBUG] Sample decoded successfully: ${url}`);
-          console.log(`[DEBUG] - Buffer length: ${buffer.length} samples`);
-          console.log(`[DEBUG] - Sample rate: ${buffer.sampleRate} Hz`);
-          sampleBuffer[iteration] = buffer;
-          console.log(`[DEBUG] Updated sample buffer status:`, 
-            sampleBuffer.map((buf, i) => `${i}: ${buf ? 'loaded' : 'empty'}`));
-          if (iteration < 3) {
-            loadSample(name, iteration + 1);
-          }
-        }, 
-        function(error) {
-          console.error(`Error decoding sample ${url}:`, error);
-          console.error(`[DEBUG] Decode error details:`, {
-            error: error?.message || 'Unknown error',
-            context: audioContext?.state
-          });
-          handleLoadError(name, iteration, new Error(`Failed to decode audio data: ${error?.message || 'Unknown error'}`));
-        }
-      );
-    } else {
-      console.error(`[DEBUG] HTTP error loading ${url}:`, {
-        status: request.status,
-        statusText: request.statusText,
-        responseType: request.responseType,
-        responseURL: request.responseURL
-      });
-      handleLoadError(name, iteration, new Error(`HTTP error ${request.status}: ${request.statusText}`));
-    }
-  };
-
-  request.onerror = function() {
-    console.error(`[DEBUG] Network error loading sample: ${url}`);
-    console.error(`[DEBUG] Request details:`, {
-      readyState: request.readyState,
-      status: request.status,
-      statusText: request.statusText
-    });
-    handleLoadError(name, iteration, new Error(`Network error loading sample: ${url}`));
-  };
-
-  console.log(`[DEBUG] Sending request for: ${url}`);
-  request.send();
-}
-
-function handleLoadError(name: string, iteration: number, error: Error): void {
-  console.error(`Error loading sample:`, error);
-  if (name !== "piano") {
-    if (debugLoading) console.log("Attempting to load fallback piano sample...");
-    loadSample("piano", iteration);
-  } else {
-    console.error("Even piano fallback failed:", error);
   }
 }
 
 export function playNote(freq: number): { source: AudioBufferSourceNode; gainNode: GainNode } | null {
-  if (!audioContext) {
+  if (!settings.audioContext) {
     console.error("[DEBUG] No audio context available for playback");
-    console.error("[DEBUG] Audio context state: suspended");
-    return null;
-  }
-  
-  // Choose sample
-  let sampleFreq = 110;
-  let sampleNumber = 0;
-  if (freq > 155) {
-    if (freq > 311) {
-      if (freq > 622) {
-        sampleFreq = 880;
-        sampleNumber = 3;
-      } else {
-        sampleFreq = 440;
-        sampleNumber = 2;
-      }
-    } else {
-      sampleFreq = 220;
-      sampleNumber = 1;
-    }
-  }
-
-  console.log(`[DEBUG] Playing note:`, {
-    requestedFreq: freq,
-    selectedSample: sampleNumber,
-    sampleFreq: sampleFreq,
-    playbackRate: freq / sampleFreq,
-    contextState: audioContext.state,
-    bufferStatus: sampleBuffer.map((buf, i) => `${i}: ${buf ? 'loaded' : 'empty'}`)
-  });
-
-  if (!sampleBuffer[sampleNumber]) {
-    console.error(`[DEBUG] Sample ${sampleNumber} not loaded yet. Buffer status:`, 
-      sampleBuffer.map((buf, i) => `${i}: ${buf ? 'loaded' : 'empty'}`));
     return null;
   }
 
-  const source = audioContext.createBufferSource();
-  source.buffer = sampleBuffer[sampleNumber]!;
-  source.playbackRate.value = freq / sampleFreq;
+  const buffer = sampleManager.getBuffer(freq);
+  if (!buffer) {
+    console.error("[DEBUG] No sample buffer available for frequency:", freq);
+    return null;
+  }
+
+  const source = settings.audioContext.createBufferSource();
+  source.buffer = buffer;
   
-  const gainNode = audioContext.createGain();
+  // Calculate playback rate
+  const baseFreq = getBaseFrequency(buffer.sampleRate);
+  source.playbackRate.value = freq / baseFreq;
+  
+  const gainNode = settings.audioContext.createGain();
   source.connect(gainNode);
-  gainNode.connect(audioContext.destination);
+  gainNode.connect(settings.audioContext.destination);
   gainNode.gain.value = 0.3;
   
-  if (debugLoading) console.log(`Playing note with rate ${source.playbackRate.value}, gain ${gainNode.gain.value}`);
   source.start(0);
-
+  
+  // Register with audio node manager
+  audioNodeManager.add(gainNode, source, freq);
+  
   return { source, gainNode };
 }
 
-export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNode | null, sustain = false): void {
-  if (!audioContext || sustain) return;
+export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNode | null): void {
+  if (!settings?.audioContext || settings.sustain) return;
   
-  const fadeout = audioContext.currentTime + sampleFadeout;
-  if (gainNode) {
-    gainNode.gain.setTargetAtTime(0, audioContext.currentTime, sampleFadeout);
+  if (gainNode?.gain) {
+    gainNode.gain.setTargetAtTime(0, settings.audioContext.currentTime, settings.fadeoutTime);
   }
   if (source) {
-    source.stop(fadeout + 4);
+    const releaseTime = settings.audioContext.currentTime + settings.fadeoutTime;
+    source.stop(releaseTime + 0.2);
   }
 }
 
-export function getMidiFromCoords(coords: { x: number; y: number }, rSteps: number, urSteps: number, octaveOffset: number = 0): number {
+export function getMidiFromCoords(coords: Point, rSteps: number, urSteps: number, octaveOffset: number = 0): number {
   return 60 + // C4 base note
-    (octaveOffset * 12) + // Apply octave offset (12 semitones per octave)
+    (octaveOffset * 12) + // Apply octave offset
     coords.x * rSteps +
     coords.y * urSteps;
 }
 
-export function setSampleFadeout(fadeout: number): void {
-  sampleFadeout = fadeout;
-}
-
-export function getAudioContext(): AudioContext | undefined {
-  return audioContext;
-}
-
-export function loadInstrumentSamples(): void {
+export async function loadInstrumentSamples(): Promise<void> {
   const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-  const instrumentOption = instrumentSelect ? instrumentSelect.selectedIndex : 0;
-  console.log("[DEBUG] Selected instrument index:", instrumentOption);
+  if (!instrumentSelect) return;
 
-  if (instrumentSelect && instrumentSelect.querySelector(':checked')?.parentElement instanceof HTMLOptGroupElement) {
-    const parentElement = instrumentSelect.querySelector(':checked')?.parentElement as HTMLOptGroupElement;
-    if (parentElement.label === 'MIDI out') {
-      const selectedOption = instrumentSelect.querySelector(':checked');
-      if (selectedOption?.textContent) {
-        window.WebMidi.getOutputByName(selectedOption.textContent);
-        console.log("[DEBUG] MIDI output selected:", window.WebMidi.getOutputByName(selectedOption.textContent));
-        if (window.WebMidi.getOutputByName(selectedOption.textContent)) {
-          window.WebMidi.getOutputByName(selectedOption.textContent).sendAllSoundOff();
-        }
-      }
+  const selectedOption = instrumentSelect.querySelector(':checked');
+  if (!selectedOption) return;
+
+  const parentElement = selectedOption.parentElement;
+  if (parentElement instanceof HTMLOptGroupElement && parentElement.label === 'MIDI out') {
+    if (selectedOption.textContent) {
+      const midiOutput = window.WebMidi.getOutputByName(selectedOption.textContent);
+      noteEventManager.setMidiOutput(midiOutput);
       return;
     }
   }
 
-  let instrumentToLoad = instruments[instrumentOption];
-  if (!instrumentToLoad) {
-    console.error("[DEBUG] No instrument selected, defaulting to piano");
-    instrumentToLoad = instruments[0]; // Default to piano
-  }
-  console.log("[DEBUG] Selected instrument:", {
-    index: instrumentOption,
-    name: instrumentToLoad.fileName,
-    fade: instrumentToLoad.fade
-  });
+  // Load regular instrument samples
+  const instrumentOption = instrumentSelect.selectedIndex;
+  const instrumentToLoad = instruments[instrumentOption] || instruments[0]; // Default to piano
   
-  // Load the samples
   try {
-    console.log("[DEBUG] About to load samples:", {
-      instrument: instrumentToLoad.fileName,
-      fade: instrumentToLoad.fade
-    });
-    loadSample(instrumentToLoad.fileName, 0);
-    setSampleFadeout(instrumentToLoad.fade);
+    await sampleManager.loadInstrument(instrumentToLoad);
+    noteEventManager.setMidiOutput(null); // Disable MIDI when using samples
   } catch (error) {
-    console.error("[DEBUG] Error loading samples:", error);
+    console.error("[DEBUG] Error loading instrument:", error);
     // Try loading piano as fallback
-    console.log("[DEBUG] Attempting to load piano as fallback...");
-    loadSample("piano", 0);
-    setSampleFadeout(0.1);
+    if (instrumentToLoad.fileName !== 'piano') {
+      await sampleManager.loadInstrument(instruments[0]);
+    }
   }
+}
+
+function getBaseFrequency(sampleRate: number): number {
+  return sampleRate === 44100 ? 440 : 880;
 } 

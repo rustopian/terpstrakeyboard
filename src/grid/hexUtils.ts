@@ -3,7 +3,9 @@ import { Point } from '../core/geometry';
 import { applyMatrixToPoint } from '../core/geometry';
 import { roundTowardZero } from '../core/geometry';
 import { CentsResult } from '../core/types';
-import { GridSettings } from '../settings/SettingsTypes';
+import type { GridSettings } from '../settings/SettingsTypes';
+import { hasGridProps } from '../settings/SettingsTypes';
+
 // Type definitions
 interface HexVerticesResult {
   x: number[];
@@ -12,7 +14,10 @@ interface HexVerticesResult {
 
 let settings: GridSettings | undefined;
 
-export function initHexUtils(gridSettings: GridSettings): void {
+export function initHexUtils(gridSettings: unknown): void {
+  if (!hasGridProps(gridSettings)) {
+    throw new Error('Missing required grid properties');
+  }
   settings = gridSettings;
 }
 

@@ -1,7 +1,7 @@
 import { Point } from '../core/geometry';
 import { ColorVisionType } from '../color/colorTransform';
 import { ActiveHex } from '../audio/activeHex';
-import type { AudioBufferNullable, RotationMatrix } from './SettingsTypes';
+import type { RotationMatrix } from './SettingsTypes';
 
 export interface Settings {
   scale: number[];

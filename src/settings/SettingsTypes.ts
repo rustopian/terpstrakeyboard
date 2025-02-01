@@ -79,6 +79,7 @@ export type GridSettings = GridRequired;
  * @property audioContext - Web Audio API context (optional until initialized)
  * @property activeHexObjects - Currently active/sounding notes
  * @property sustainedNotes - Notes held by sustain
+ * @property fadeoutTime - Note release time in seconds
  */
 export interface EventHandlerRequired {
   canvas: HTMLCanvasElement;
@@ -103,6 +104,7 @@ export interface EventHandlerRequired {
   activeHexObjects: ActiveHex[];
   sustainedNotes: ActiveHex[];
   sustain: boolean;
+  fadeoutTime: number;
 }
 
 /**
