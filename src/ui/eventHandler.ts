@@ -12,7 +12,15 @@ interface TouchActiveHex extends ActiveHex {
 
 /**
  * Runtime state for the keyboard.
- * Tracks active notes, pressed keys, and interaction state.
+ * This interface defines all transient state that changes during keyboard operation.
+ * Separating this from settings helps prevent state/configuration confusion.
+ * 
+ * @property activeHexObjects - Currently sounding notes
+ * @property pressedKeys - Currently pressed keyboard keys
+ * @property sustainedNotes - Notes held by sustain pedal
+ * @property isMouseDown - Mouse button state
+ * @property isTouchDown - Touch state
+ * @property isSustainOn - Sustain pedal state
  */
 interface KeyboardState {
   activeHexObjects: TouchActiveHex[];
@@ -26,6 +34,15 @@ interface KeyboardState {
 /**
  * Configuration settings for the keyboard.
  * Contains only non-transient settings that define keyboard behavior.
+ * These settings should not change during normal operation.
+ * 
+ * @property canvas - The rendering canvas
+ * @property keyCodeToCoords - Mapping of keyboard keys to grid coordinates
+ * @property rSteps - Right-facing steps in the grid
+ * @property urSteps - Up-right facing steps in the grid
+ * @property fundamental - Base frequency for note calculation
+ * @property octaveOffset - Octave shift from middle C
+ * @property toggle_mode - Whether notes stay on when key is released
  */
 interface Settings {
   canvas: HTMLCanvasElement;
@@ -227,17 +244,18 @@ function onKeyDown(e: KeyboardEvent): void {
   } else if (!state.isMouseDown && !state.isTouchDown
       && (e.keyCode in settings.keyCodeToCoords)
       && state.pressedKeys.indexOf(e.keyCode) === -1) {
-    state.pressedKeys.push(e.keyCode);
+    
     const hexCoords = settings.keyCodeToCoords[e.keyCode];
-    const hex = new ActiveHex(hexCoords);
-    if (!state.activeHexObjects) {
-      state.activeHexObjects = [];
+    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+
+    if (settings.toggle_mode) {
+      // In toggle mode, just toggle the note
+      handleNote(hexCoords, !isNoteActive(note));
+    } else {
+      // In normal mode, activate the note
+      state.pressedKeys.push(e.keyCode);
+      handleNote(hexCoords, true);
     }
-    state.activeHexObjects.push(hex);
-    addActiveNote(hex);
-    const centsObj = hexCoordsToCents(hexCoords);
-    hex.noteOn(centsObj);
-    drawHex(hexCoords, centsToColor(centsObj, true));
   }
 }
 
@@ -263,11 +281,14 @@ function onKeyUp(e: KeyboardEvent): void {
       state.sustainedNotes = [];
     }
   } else if (!state.isMouseDown && !state.isTouchDown
-      && (e.keyCode in settings.keyCodeToCoords)) {
+      && (e.keyCode in settings.keyCodeToCoords)
+      && !settings.toggle_mode) { // Only handle key up in non-toggle mode
+    
     const keyIndex = state.pressedKeys.indexOf(e.keyCode);
     if (keyIndex !== -1) {
       state.pressedKeys.splice(keyIndex, 1);
       const hexCoords = settings.keyCodeToCoords[e.keyCode];
+      
       if (state.isSustainOn) {
         // Move the note to sustained notes instead of releasing it
         const hex = state.activeHexObjects.find(h => hexCoords.equals(h.coords));
@@ -276,19 +297,7 @@ function onKeyUp(e: KeyboardEvent): void {
         }
       } else {
         // Normal note release
-        const centsObj = hexCoordsToCents(hexCoords);
-        drawHex(hexCoords, centsToColor(centsObj, false));
-        if (state.activeHexObjects) {
-          const hexIndex = state.activeHexObjects.findIndex((hex) => 
-            hexCoords.equals(hex.coords)
-          );
-          if (hexIndex !== -1) {
-            const hex = state.activeHexObjects[hexIndex];
-            hex.noteOff();
-            removeActiveNote(hex);
-            state.activeHexObjects.splice(hexIndex, 1);
-          }
-        }
+        handleNote(hexCoords, false);
       }
     }
   }
@@ -296,52 +305,79 @@ function onKeyUp(e: KeyboardEvent): void {
 
 /**
  * Interface for note activation/deactivation actions.
- * Used primarily in toggle mode and initial note activation.
+ * Used to standardize note interaction across different input methods.
+ * 
+ * @property coords - The grid coordinates where the action occurs
+ * @property isActive - The desired state of the note (true = on, false = off)
  */
 interface NoteAction {
-  coords: Point;  // Screen coordinates
-  isActive: boolean;  // Whether to activate or deactivate the note
+  coords: Point;
+  isActive: boolean;
 }
 
 /**
- * Handles note activation/deactivation from screen coordinates.
- * Used primarily in toggle mode and for initial note activation.
- * - Converts screen coordinates to hex coordinates
- * - Checks for already active notes
- * - Manages note state and visual feedback
+ * Centralized function for activating/deactivating notes.
+ * This is the core function for all note interactions in the keyboard.
  * 
- * @param action - The note action to perform
+ * Features:
+ * - Handles both MIDI and audio output
+ * - Manages visual feedback (hex colors)
+ * - Tracks note state
+ * - Supports touch input with individual touch tracking
+ * - Works in both toggle and non-toggle modes
+ * - Maintains sustain functionality
+ * 
+ * @param coords - The hex grid coordinates of the note
+ * @param isActive - Whether to activate (true) or deactivate (false) the note
+ * @param touchId - Optional touch identifier for multi-touch support
+ * @returns The created or removed ActiveHex object, or null if operation failed
  */
-function handleNoteAction(action: NoteAction): void {
-  if (!settings) return;
+function handleNote(coords: Point, isActive: boolean, touchId?: number): ActiveHex | null {
+  if (!settings) return null;
 
-  const hexCoords = getHexCoordsAt(action.coords);
-  const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
-
-  if (action.isActive) {
-    if (isNoteActive(note)) return; // Note already active
-    
-    const hex = new ActiveHex(hexCoords);
-    if (!state.activeHexObjects) {
-      state.activeHexObjects = [];
+  if (isActive) {
+    const hex = new ActiveHex(coords) as TouchActiveHex;
+    if (touchId !== undefined) {
+      hex.touchId = touchId;
     }
     state.activeHexObjects.push(hex);
     addActiveNote(hex);
-    const centsObj = hexCoordsToCents(hexCoords);
+    const centsObj = hexCoordsToCents(coords);
     hex.noteOn(centsObj);
-    drawHex(hexCoords, centsToColor(centsObj, true));
+    drawHex(coords, centsToColor(centsObj, true));
+    return hex;
   } else {
-    if (!state.activeHexObjects) return;
-    
-    const hexIndex = state.activeHexObjects.findIndex((h: TouchActiveHex) => hexCoords.equals(h.coords));
+    const hexIndex = state.activeHexObjects.findIndex((h: TouchActiveHex) => 
+      coords.equals(h.coords) && (touchId === undefined || h.touchId === touchId)
+    );
     if (hexIndex !== -1) {
       const hex = state.activeHexObjects[hexIndex];
       hex.noteOff();
       removeActiveNote(hex);
       state.activeHexObjects.splice(hexIndex, 1);
-      drawHex(hexCoords, centsToColor(hexCoordsToCents(hexCoords), false));
+      const centsObj = hexCoordsToCents(coords);
+      drawHex(coords, centsToColor(centsObj, false));
+      return hex;
     }
   }
+  return null;
+}
+
+/**
+ * Handles note activation/deactivation from coordinates.
+ * This is a wrapper around handleNote that provides backward compatibility
+ * and simpler interface for basic note actions.
+ * 
+ * Used primarily by:
+ * - Toggle mode interactions
+ * - Initial note activation
+ * - External note triggers
+ * 
+ * @param action - Object containing coordinates and desired note state
+ */
+function handleNoteAction(action: NoteAction): void {
+  if (!settings) return;
+  handleNote(action.coords, action.isActive);
 }
 
 /**
@@ -355,21 +391,15 @@ const mouseDown = (e: MouseEvent) => {
   
   state.isMouseDown = true;
   const screenCoords = getUnifiedPointerPosition(e);
+  const hexCoords = getHexCoordsAt(screenCoords);
   
   if (settings.toggle_mode) {
     // In toggle mode, just toggle the note
-    const hexCoords = getHexCoordsAt(screenCoords);
     const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
-    handleNoteAction({
-      coords: screenCoords,
-      isActive: !isNoteActive(note)
-    });
+    handleNote(hexCoords, !isNoteActive(note));
   } else {
     // In normal mode, activate the note
-    handleNoteAction({
-      coords: screenCoords,
-      isActive: true
-    });
+    handleNote(hexCoords, true);
     settings.canvas.addEventListener("mousemove", mouseActive, false);
   }
 };
@@ -429,27 +459,13 @@ function mouseActive(e: MouseEvent): void {
   const hexCoords = getHexCoordsAt(screenCoords);
   
   if (!state.activeHexObjects?.length) {
-    handleNoteAction({
-      coords: screenCoords,
-      isActive: true
-    });
+    handleNote(hexCoords, true);
   } else {
     // Always deactivate the previous note in non-toggle mode for glissando behavior
     const oldHex = state.activeHexObjects[0];
     if (!hexCoords.equals(oldHex.coords)) {
-      oldHex.noteOff();
-      removeActiveNote(oldHex);
-      const oldCentsObj = hexCoordsToCents(oldHex.coords);
-      drawHex(oldHex.coords, centsToColor(oldCentsObj, false));
-      state.activeHexObjects.splice(0, 1);
-
-      // Then activate the new note
-      const hex = new ActiveHex(hexCoords);
-      state.activeHexObjects[0] = hex;
-      addActiveNote(hex);
-      const centsObj = hexCoordsToCents(hexCoords);
-      hex.noteOn(centsObj);
-      drawHex(hexCoords, centsToColor(centsObj, true));
+      handleNote(oldHex.coords, false);
+      handleNote(hexCoords, true);
     }
   }
 }
@@ -520,10 +536,7 @@ function handleTouch(e: TouchEvent): void {
       const screenCoords = getUnifiedPointerPosition(e.touches[0]);
       const hexCoords = getHexCoordsAt(screenCoords);
       const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
-      handleNoteAction({
-        coords: screenCoords,
-        isActive: !isNoteActive(note)
-      });
+      handleNote(hexCoords, !isNoteActive(note));
     }
     return;
   }
@@ -531,10 +544,6 @@ function handleTouch(e: TouchEvent): void {
   // Normal mode
   state.isTouchDown = e.targetTouches.length !== 0;
   
-  if (!state.activeHexObjects) {
-    state.activeHexObjects = [];
-  }
-
   // Create a map of currently active touches
   const currentTouches = new Map();
   for (let i = 0; i < e.targetTouches.length; i++) {
@@ -547,29 +556,14 @@ function handleTouch(e: TouchEvent): void {
   for (let i = state.activeHexObjects.length - 1; i >= 0; i--) {
     const hex = state.activeHexObjects[i] as TouchActiveHex;
     let found = false;
-    let moved = false;
 
     // Check if this note's touch still exists and if it moved
     for (const [identifier, hexCoords] of currentTouches) {
       if (hex.touchId === identifier) {
         found = true;
         if (!hexCoords.equals(hex.coords)) {
-          moved = true;
-          // Remove old note
-          hex.noteOff();
-          removeActiveNote(hex);
-          const oldCentsObj = hexCoordsToCents(hex.coords);
-          drawHex(hex.coords, centsToColor(oldCentsObj, false));
-          state.activeHexObjects.splice(i, 1);
-          
-          // Add new note
-          const newHex = new ActiveHex(hexCoords) as TouchActiveHex;
-          newHex.touchId = identifier;
-          state.activeHexObjects.push(newHex);
-          addActiveNote(newHex);
-          const centsObj = hexCoordsToCents(hexCoords);
-          newHex.noteOn(centsObj);
-          drawHex(hexCoords, centsToColor(centsObj, true));
+          handleNote(hex.coords, false, hex.touchId);
+          handleNote(hexCoords, true, identifier);
         }
         break;
       }
@@ -577,11 +571,7 @@ function handleTouch(e: TouchEvent): void {
 
     // If touch no longer exists, remove the note
     if (!found) {
-      hex.noteOff();
-      removeActiveNote(hex);
-      const oldCentsObj = hexCoordsToCents(hex.coords);
-      drawHex(hex.coords, centsToColor(oldCentsObj, false));
-      state.activeHexObjects.splice(i, 1);
+      handleNote(hex.coords, false, hex.touchId);
     }
   }
 
@@ -599,20 +589,27 @@ function handleTouch(e: TouchEvent): void {
     if (!found) {
       const screenCoords = getUnifiedPointerPosition(touch);
       const hexCoords = getHexCoordsAt(screenCoords);
-      const hex = new ActiveHex(hexCoords) as TouchActiveHex;
-      hex.touchId = touch.identifier;
-      state.activeHexObjects.push(hex);
-      addActiveNote(hex);
-      const centsObj = hexCoordsToCents(hexCoords);
-      hex.noteOn(centsObj);
-      drawHex(hexCoords, centsToColor(centsObj, true));
+      handleNote(hexCoords, true, touch.identifier);
     }
   }
 }
 
 /**
  * Releases all active notes and resets the keyboard state.
- * Handles both visual feedback and state cleanup.
+ * This is a critical function for cleanup and state reset.
+ * 
+ * Handles:
+ * - MIDI note-off messages
+ * - Audio note release
+ * - Visual state cleanup
+ * - State reset for all tracking variables
+ * - Sustain release
+ * 
+ * Used by:
+ * - Release All button
+ * - Page unload
+ * - Error recovery
+ * - Mode switching
  */
 function handleReleaseAll(): void {
   if (!settings) return;

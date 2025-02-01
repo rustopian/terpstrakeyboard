@@ -3,17 +3,17 @@ import { Point } from '../core/geometry';
 import { applyMatrixToPoint } from '../core/geometry';
 import { roundTowardZero } from '../core/geometry';
 import { CentsResult } from '../core/types';
-import { Settings } from '../settings/Settings';
+import { GridSettings } from '../settings/SettingsTypes';
 // Type definitions
 interface HexVerticesResult {
   x: number[];
   y: number[];
 }
 
-let settings: Settings | undefined;
+let settings: GridSettings | undefined;
 
-export function initHexUtils(appSettings: Settings): void {
-  settings = appSettings;
+export function initHexUtils(gridSettings: GridSettings): void {
+  settings = gridSettings;
 }
 
 export function hexCoordsToScreen(hex: Point): Point {

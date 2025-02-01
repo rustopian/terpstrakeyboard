@@ -5,6 +5,7 @@ import { hex2rgb, adjustColorSaturation } from '../color/colorUtils';
 import { drawGrid } from '../grid/displayUtils';
 import { defaultSettings } from './Settings';
 import { Settings } from './Settings';
+import { EventHandlerSettings, AudioSettings, DisplaySettings, GridSettings } from './SettingsTypes';
 
 // Add interface for preset structure
 interface Preset {
@@ -39,8 +40,104 @@ export class SettingsManager {
         this.settings = { ...defaultSettings };
     }
 
+    /**
+     * Gets the complete settings object.
+     * Use with caution - prefer the specific typed getters.
+     */
     public getSettings(): Settings {
         return this.settings;
+    }
+
+    /**
+     * Gets settings required for event handling.
+     * Used by the event handling system for input processing.
+     */
+    public getEventHandlerSettings(): EventHandlerSettings {
+        return {
+            canvas: this.settings.canvas,
+            keyCodeToCoords: this.settings.keyCodeToCoords,
+            rSteps: this.settings.rSteps,
+            urSteps: this.settings.urSteps,
+            fundamental: this.settings.fundamental,
+            octaveOffset: this.settings.octaveOffset,
+            toggle_mode: this.settings.toggle_mode,
+            hexSize: this.settings.hexSize,
+            rotationMatrix: this.settings.rotationMatrix,
+            hexWidth: this.settings.hexWidth,
+            hexVert: this.settings.hexVert,
+            pressedKeys: [],
+            isMouseDown: false,
+            isTouchDown: false,
+            activeHexObjects: [],
+            sustainedNotes: [],
+            sustain: false
+        };
+    }
+
+    /**
+     * Gets settings required for audio processing.
+     * Used by the audio system for sound generation and MIDI.
+     */
+    public getAudioSettings(): AudioSettings {
+        return {
+            rSteps: this.settings.rSteps,
+            urSteps: this.settings.urSteps,
+            fundamental: this.settings.fundamental,
+            octaveOffset: this.settings.octaveOffset,
+            sustain: this.settings.sustain,
+            sustainedNotes: this.settings.sustainedNotes,
+            audioContext: this.settings.audioContext,
+            midi_enabled: this.settings.midi_enabled,
+            sampleBuffer: this.settings.sampleBuffer,
+            fadeoutTime: this.settings.fadeoutTime
+        };
+    }
+
+    /**
+     * Gets settings required for display rendering.
+     * Used by the display system for visual output.
+     */
+    public getDisplaySettings(): DisplaySettings {
+        return {
+            canvas: this.settings.canvas,
+            context: this.settings.context,
+            hexSize: this.settings.hexSize,
+            rotation: this.settings.rotation,
+            colorVisionMode: this.settings.colorVisionMode,
+            colorSaturation: this.settings.colorSaturation,
+            textSize: this.settings.textSize,
+            no_labels: this.settings.no_labels,
+            names: this.settings.names,
+            enum: this.settings.enum,
+            equivSteps: this.settings.equivSteps,
+            rotationMatrix: this.settings.rotationMatrix,
+            centerpoint: this.settings.centerpoint,
+            hexWidth: this.settings.hexWidth,
+            hexVert: this.settings.hexVert,
+            keycolors: this.settings.keycolors,
+            useKeyImage: this.settings.useKeyImage,
+            keyImage: this.settings.keyImage
+        };
+    }
+
+    /**
+     * Gets settings required for grid calculations.
+     * Used by the grid system for coordinate handling.
+     */
+    public getGridSettings(): GridSettings {
+        return {
+            rSteps: this.settings.rSteps,
+            urSteps: this.settings.urSteps,
+            hexSize: this.settings.hexSize,
+            rotation: this.settings.rotation,
+            rotationMatrix: this.settings.rotationMatrix,
+            centerpoint: this.settings.centerpoint,
+            hexWidth: this.settings.hexWidth,
+            hexVert: this.settings.hexVert,
+            scale: this.settings.scale,
+            equivInterval: this.settings.equivInterval,
+            octaveOffset: this.settings.octaveOffset
+        };
     }
 
     public initializeCanvas(): void {

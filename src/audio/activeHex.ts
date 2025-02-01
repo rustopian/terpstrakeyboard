@@ -4,6 +4,7 @@ import { updateChordDisplay } from './chordRecognition';
 import { centsToColor } from '../grid/displayUtils';
 import { drawHex } from '../grid/displayUtils';
 import { hexCoordsToCents } from '../grid/hexUtils';
+import { AudioSettings } from '../settings/SettingsTypes';
 
 declare global {
   interface WebMidiOutput {
@@ -16,20 +17,12 @@ declare global {
   var WebMidi: WebMidi;
 }
 
-interface Settings {
-  rSteps: number;
-  urSteps: number;
-  fundamental: number;
-  octaveOffset: number;
-  [key: string]: any; // For any additional settings
-}
-
 interface AudioResult {
   source: AudioBufferSourceNode;
   gainNode: GainNode;
 }
 
-let settings: Settings | undefined;
+let settings: AudioSettings | undefined;
 let myOutput: WebMidiOutput | null = null;
 
 // Track both held and toggled notes
@@ -39,7 +32,7 @@ const toggledNotes = new Set<number>();
 // Track active audio nodes
 const activeAudioNodes = new Set<{gainNode: GainNode | null, source: AudioBufferSourceNode | null}>();
 
-export function initActiveHex(appSettings: Settings, output: WebMidiOutput | null): void {
+export function initActiveHex(appSettings: AudioSettings, output: WebMidiOutput | null): void {
   settings = appSettings;
   myOutput = output;
 }

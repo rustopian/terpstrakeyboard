@@ -3,13 +3,13 @@ import { Point } from '../core/geometry';
 import { hexCoordsToScreen, getHexVertices, hexCoordsToCents } from './hexUtils';
 import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils';
 import { CentsResult } from '../core/types';
-import { Settings } from '../settings/Settings';
+import { DisplaySettings } from '../settings/SettingsTypes';
 
-let settings: Settings;
+let settings: DisplaySettings;
 export let current_text_color = "#000000";
 
-export function initDisplayUtils(appSettings: Settings): void {
-  settings = appSettings;
+export function initDisplayUtils(displaySettings: DisplaySettings): void {
+  settings = displaySettings;
 }
 
 export function drawHex(coords: Point, color?: string): void {
