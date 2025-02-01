@@ -176,48 +176,65 @@ function onKeyUp(e: KeyboardEvent): void {
   }
 }
 
-// Store mousedown and mouseup handlers as named functions so we can remove them
-const mouseDown = (e: MouseEvent) => {
-  if (!settings || settings.pressedKeys.length !== 0 || settings.isTouchDown) {
-    return;
+// Unified note handling
+interface NoteAction {
+  coords: Point;
+  isActive: boolean;
+}
+
+function handleNoteAction(action: NoteAction): void {
+  if (!settings) return;
+
+  const hexCoords = getHexCoordsAt(action.coords);
+  const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+
+  if (action.isActive) {
+    if (isNoteActive(note)) return; // Note already active
+    
+    const hex = new ActiveHex(hexCoords);
+    if (!settings.activeHexObjects) {
+      settings.activeHexObjects = [];
+    }
+    settings.activeHexObjects.push(hex);
+    addActiveNote(hex);
+    const centsObj = hexCoordsToCents(hexCoords);
+    hex.noteOn(centsObj);
+    drawHex(hexCoords, centsToColor(centsObj, true));
+  } else {
+    if (!settings.activeHexObjects) return;
+    
+    const hexIndex = settings.activeHexObjects.findIndex((h) => hexCoords.equals(h.coords));
+    if (hexIndex !== -1) {
+      const hex = settings.activeHexObjects[hexIndex];
+      hex.noteOff();
+      removeActiveNote(hex);
+      settings.activeHexObjects.splice(hexIndex, 1);
+      drawHex(hexCoords, centsToColor(hexCoordsToCents(hexCoords), false));
+    }
   }
-  settings.isMouseDown = true;
+}
+
+const mouseDown = (e: MouseEvent) => {
+  if (!settings || settings.pressedKeys.length !== 0 || settings.isTouchDown) return;
   
-  // Get the hex coordinates for the click
-  const coords = getHexCoordsAt(getPointerPosition(e));
+  settings.isMouseDown = true;
+  const screenCoords = getUnifiedPointerPosition(e);
   
   if (settings.toggle_mode) {
-    // In toggle mode, just toggle the note on click
-    const hex = new ActiveHex(coords);
-    const note = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
-    
-    if (isNoteActive(note)) {
-      // Note is active, deactivate it
-      if (settings.activeHexObjects) {
-        const hexIndex = settings.activeHexObjects.findIndex((h) => coords.equals(h.coords));
-        if (hexIndex !== -1) {
-          const hex = settings.activeHexObjects[hexIndex];
-          hex.noteOff();
-          removeActiveNote(hex);
-          settings.activeHexObjects.splice(hexIndex, 1);
-          drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
-        }
-      }
-    } else {
-      // Note is not active, activate it
-      if (!settings.activeHexObjects) {
-        settings.activeHexObjects = [];
-      }
-      settings.activeHexObjects.push(hex);
-      addActiveNote(hex);
-      const centsObj = hexCoordsToCents(coords);
-      hex.noteOn(centsObj);
-      drawHex(coords, centsToColor(centsObj, true));
-    }
+    // In toggle mode, just toggle the note
+    const hexCoords = getHexCoordsAt(screenCoords);
+    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+    handleNoteAction({
+      coords: screenCoords,
+      isActive: !isNoteActive(note)
+    });
   } else {
-    // In normal mode, use the original behavior
+    // In normal mode, activate the note
+    handleNoteAction({
+      coords: screenCoords,
+      isActive: true
+    });
     settings.canvas.addEventListener("mousemove", mouseActive, false);
-    mouseActive(e);
   }
 };
 
@@ -257,58 +274,50 @@ interface Position {
 function mouseActive(e: MouseEvent): void {
   if (!settings || settings.toggle_mode) return;
   
-  let coords = getPointerPosition(e);
-  coords = getHexCoordsAt(coords);
-
-  if (!settings.activeHexObjects) {
-    settings.activeHexObjects = [];
-  }
-
-  if (settings.activeHexObjects.length === 0) {
-    const hex = new ActiveHex(coords);
-    settings.activeHexObjects[0] = hex;
-    addActiveNote(hex);
-    const centsObj = hexCoordsToCents(coords);
-    hex.noteOn(centsObj);
-    drawHex(coords, centsToColor(centsObj, true));
+  const screenCoords = getUnifiedPointerPosition(e);
+  const hexCoords = getHexCoordsAt(screenCoords);
+  
+  if (!settings.activeHexObjects?.length) {
+    handleNoteAction({
+      coords: screenCoords,
+      isActive: true
+    });
   } else {
-    if (!(coords.equals(settings.activeHexObjects[0].coords))) {
-      const oldHex = settings.activeHexObjects[0];
+    // Always deactivate the previous note in non-toggle mode for glissando behavior
+    const oldHex = settings.activeHexObjects[0];
+    if (!hexCoords.equals(oldHex.coords)) {
       oldHex.noteOff();
       removeActiveNote(oldHex);
       const oldCentsObj = hexCoordsToCents(oldHex.coords);
       drawHex(oldHex.coords, centsToColor(oldCentsObj, false));
+      settings.activeHexObjects.splice(0, 1);
 
-      const newHex = new ActiveHex(coords);
-      settings.activeHexObjects[0] = newHex;
-      addActiveNote(newHex);
-      const centsObj = hexCoordsToCents(coords);
-      newHex.noteOn(centsObj);
-      drawHex(coords, centsToColor(centsObj, true));
+      // Then activate the new note
+      const hex = new ActiveHex(hexCoords);
+      settings.activeHexObjects[0] = hex;
+      addActiveNote(hex);
+      const centsObj = hexCoordsToCents(hexCoords);
+      hex.noteOn(centsObj);
+      drawHex(hexCoords, centsToColor(centsObj, true));
     }
   }
 }
 
-function getPointerPosition(e: MouseEvent): Point {
-  const parentPosition = getPosition(e.currentTarget as HTMLElement);
-  const xPosition = e.clientX - parentPosition.x;
-  const yPosition = e.clientY - parentPosition.y;
-  return new Point(xPosition, yPosition);
-}
-
-function getPosition(element: HTMLElement): Position {
-  let xPosition = 0;
-  let yPosition = 0;
-
-  while (element) {
-    xPosition += (element.offsetLeft - element.scrollLeft + element.clientLeft);
-    yPosition += (element.offsetTop - element.scrollTop + element.clientTop);
-    element = element.offsetParent as HTMLElement;
+// Unified pointer position calculation for both mouse and touch events
+function getUnifiedPointerPosition(e: MouseEvent | Touch): Point {
+  const canvas = settings?.canvas;
+  if (!canvas) {
+    console.warn('Canvas not initialized');
+    return new Point(0, 0);
   }
-  return {
-    x: xPosition,
-    y: yPosition
-  };
+  
+  const rect = canvas.getBoundingClientRect();
+  
+  // Don't multiply by DPI here - the canvas context transform already handles the scaling
+  return new Point(
+    e.clientX - rect.left,
+    e.clientY - rect.top
+  );
 }
 
 function setupTouchEvents(): void {
@@ -330,87 +339,96 @@ function handleTouch(e: TouchEvent): void {
   }
 
   if (settings.toggle_mode) {
-    // Only handle touchstart events in toggle mode
     if (e.type === 'touchstart') {
-      const touch = e.touches[0];
-      const coords = getHexCoordsAt(new Point(
-        touch.pageX - settings.canvas.offsetLeft,
-        touch.pageY - settings.canvas.offsetTop
-      ));
-      
-      const note = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
-      
-      if (isNoteActive(note)) {
-        // Note is active, deactivate it
-        if (settings.activeHexObjects) {
-          const hexIndex = settings.activeHexObjects.findIndex((h) => coords.equals(h.coords));
-          if (hexIndex !== -1) {
-            const hex = settings.activeHexObjects[hexIndex];
-            hex.noteOff();
-            removeActiveNote(hex);
-            settings.activeHexObjects.splice(hexIndex, 1);
-            drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
-          }
-        }
-      } else {
-        // Note is not active, activate it
-        const hex = new ActiveHex(coords);
-        if (!settings.activeHexObjects) {
-          settings.activeHexObjects = [];
-        }
-        settings.activeHexObjects.push(hex);
-        addActiveNote(hex);
-        const centsObj = hexCoordsToCents(coords);
-        hex.noteOn(centsObj);
-        drawHex(coords, centsToColor(centsObj, true));
-      }
+      const screenCoords = getUnifiedPointerPosition(e.touches[0]);
+      const hexCoords = getHexCoordsAt(screenCoords);
+      const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+      handleNoteAction({
+        coords: screenCoords,
+        isActive: !isNoteActive(note)
+      });
     }
     return;
   }
 
-  // Original behavior for non-toggle mode
+  // Normal mode
   settings.isTouchDown = e.targetTouches.length !== 0;
-
+  
   if (!settings.activeHexObjects) {
     settings.activeHexObjects = [];
   }
 
-  for (const hex of settings.activeHexObjects) {
-    hex.release = true;
+  // Create a map of currently active touches
+  const currentTouches = new Map();
+  for (let i = 0; i < e.targetTouches.length; i++) {
+    const screenCoords = getUnifiedPointerPosition(e.targetTouches[i]);
+    const hexCoords = getHexCoordsAt(screenCoords);
+    currentTouches.set(e.targetTouches[i].identifier, hexCoords);
   }
 
-  for (let i = 0; i < e.targetTouches.length; i++) {
-    const coords = getHexCoordsAt(new Point(
-      e.targetTouches[i].pageX - settings.canvas.offsetLeft,
-      e.targetTouches[i].pageY - settings.canvas.offsetTop
-    ));
+  // First, handle existing notes that have moved
+  for (let i = settings.activeHexObjects.length - 1; i >= 0; i--) {
+    const hex = settings.activeHexObjects[i];
     let found = false;
+    let moved = false;
 
+    // Check if this note's touch still exists and if it moved
+    for (const [identifier, hexCoords] of currentTouches) {
+      if (hex.touchId === identifier) {
+        found = true;
+        if (!hexCoords.equals(hex.coords)) {
+          moved = true;
+          // Remove old note
+          hex.noteOff();
+          removeActiveNote(hex);
+          const oldCentsObj = hexCoordsToCents(hex.coords);
+          drawHex(hex.coords, centsToColor(oldCentsObj, false));
+          settings.activeHexObjects.splice(i, 1);
+          
+          // Add new note
+          const newHex = new ActiveHex(hexCoords);
+          newHex.touchId = identifier;
+          settings.activeHexObjects.push(newHex);
+          addActiveNote(newHex);
+          const centsObj = hexCoordsToCents(hexCoords);
+          newHex.noteOn(centsObj);
+          drawHex(hexCoords, centsToColor(centsObj, true));
+        }
+        break;
+      }
+    }
+
+    // If touch no longer exists, remove the note
+    if (!found) {
+      hex.noteOff();
+      removeActiveNote(hex);
+      const oldCentsObj = hexCoordsToCents(hex.coords);
+      drawHex(hex.coords, centsToColor(oldCentsObj, false));
+      settings.activeHexObjects.splice(i, 1);
+    }
+  }
+
+  // Then add any new touches
+  for (let i = 0; i < e.targetTouches.length; i++) {
+    const touch = e.targetTouches[i];
+    let found = false;
     for (const hex of settings.activeHexObjects) {
-      if (coords.equals(hex.coords)) {
-        hex.release = false;
+      if (hex.touchId === touch.identifier) {
         found = true;
         break;
       }
     }
 
     if (!found) {
-      const hex = new ActiveHex(coords);
+      const screenCoords = getUnifiedPointerPosition(touch);
+      const hexCoords = getHexCoordsAt(screenCoords);
+      const hex = new ActiveHex(hexCoords);
+      hex.touchId = touch.identifier;
       settings.activeHexObjects.push(hex);
-      const centsObj = hexCoordsToCents(coords);
+      addActiveNote(hex);
+      const centsObj = hexCoordsToCents(hexCoords);
       hex.noteOn(centsObj);
-      drawHex(coords, centsToColor(centsObj, true));
-    }
-  }
-
-  for (let i = settings.activeHexObjects.length - 1; i >= 0; i--) {
-    if (settings.activeHexObjects[i].release) {
-      const hex = settings.activeHexObjects[i];
-      const coords = hex.coords;
-      hex.noteOff();
-      removeActiveNote(hex);
-      drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
-      settings.activeHexObjects.splice(i, 1);
+      drawHex(hexCoords, centsToColor(centsObj, true));
     }
   }
 }
