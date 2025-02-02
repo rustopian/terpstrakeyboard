@@ -24,7 +24,7 @@ export class ActiveHex {
     this.coords = coords;
     const centsObj = hexCoordsToCents(coords);
     this.frequency = settings.fundamental * Math.pow(2, centsObj.cents / 1200);
-    this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+    this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
   }
 
   async noteOn(): Promise<void> {

@@ -1,4 +1,4 @@
-// Hex grid utility functions for the Terpstra Keyboard WebApp
+// Hex grid utility functions for the Temper
 import { Point } from '../core/geometry';
 import { applyMatrixToPoint } from '../core/geometry';
 import { roundTowardZero } from '../core/geometry';
@@ -37,7 +37,7 @@ export function hexCoordsToCents(coords: Point): CentsResult {
     return { cents: 0, reducedSteps: 0 };
   }
   const distance = coords.x * settings.rSteps + coords.y * settings.urSteps;
-  let octs = roundTowardZero(distance / settings.scale.length);
+  let octs = Math.floor(distance / settings.scale.length);
   let reducedSteps = distance % settings.scale.length;
   if (reducedSteps < 0) {
     reducedSteps += settings.scale.length;

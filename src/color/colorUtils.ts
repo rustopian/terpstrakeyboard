@@ -1,4 +1,4 @@
-// Color utility functions for the Terpstra Keyboard WebApp
+// Color utility functions for the Temper
 
 interface HSVColor {
   h: number;

@@ -1,6 +1,6 @@
 /**
  * @file SettingsTypes.ts
- * Type definitions for the Terpstra Keyboard WebApp settings system.
+ * Type definitions for the Temper settings system.
  * 
  * IMPORTANT: This file defines interface overlays that describe what properties each module requires.
  * These are NOT separate settings objects - they are type definitions that help ensure type safety
@@ -134,6 +134,7 @@ export interface AudioRequired {
   midi_enabled: boolean;
   sampleBuffer: AudioBuffer | null;
   fadeoutTime: number;
+  scale: number[];
 }
 
 /**

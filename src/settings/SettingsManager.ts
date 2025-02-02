@@ -240,21 +240,97 @@ export class SettingsManager {
         if (!scaleElement) return;
 
         const scaleLines = scaleElement.value.split('\n');
-        scaleLines.forEach((line) => {
-            if (line.match(/^[1234567890.\s/]+$/) && !line.match(/^\s+$/)) {
-                if (line.match(/\//)) {
+        let foundScale = false;
+        let scaleSize = 0;
+        
+        scaleLines.forEach((line, index) => {
+            // Skip comments and empty lines until we find the scale size
+            if (!foundScale) {
+                const sizeMatch = line.match(/^(\d+)\s*$/);
+                if (sizeMatch) {
+                    scaleSize = parseInt(sizeMatch[1]);
+                    foundScale = true;
+                    if (scaleSize <= 0) {
+                        console.error(`Invalid scale size ${scaleSize} on line ${index + 1}. Scale size must be positive.`);
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // Once we've found the scale size, parse numbers
+            line = line.trim();
+            if (line === '' || line.startsWith('!')) return;
+
+            try {
+                if (line.includes('/')) {
                     // Ratio
                     const [num, den] = line.split('/').map(n => parseInt(n));
-                    const ratio = 1200 * Math.log(num / den) / Math.log(2);
-                    this.settings.scale.push(ratio);
-                } else if (line.match(/\./)) {
+                    if (!isNaN(num) && !isNaN(den) && den !== 0) {
+                        const ratio = 1200 * Math.log(num / den) / Math.log(2);
+                        if (!isNaN(ratio) && isFinite(ratio)) {
+                            this.settings.scale.push(ratio);
+                        } else {
+                            console.warn(`Invalid ratio ${num}/${den} on line ${index + 1}`);
+                        }
+                    }
+                } else {
                     // Cents
-                    this.settings.scale.push(parseFloat(line));
+                    const cents = parseFloat(line);
+                    if (!isNaN(cents) && isFinite(cents)) {
+                        this.settings.scale.push(cents);
+                    } else {
+                        console.warn(`Invalid cents value "${line}" on line ${index + 1}`);
+                    }
                 }
+            } catch (e) {
+                console.warn(`Error parsing line ${index + 1}: ${line}`, e);
             }
         });
-        this.settings.equivInterval = this.settings.scale.pop() || 0;
-        this.settings.scale.unshift(0);
+
+        // Validate scale length
+        if (this.settings.scale.length === 0) {
+            console.error('No valid scale entries found. Please provide at least one valid scale degree.');
+            this.settings.scale = [0];
+            this.settings.equivInterval = 1200; // Default octave size, but no assumptions about internal divisions
+            return;
+        }
+
+        // Sort scale values to ensure they're in ascending order
+        this.settings.scale.sort((a, b) => a - b);
+
+        // Remove duplicates and validate values
+        this.settings.scale = [...new Set(this.settings.scale)].filter(x => {
+            if (!isFinite(x)) {
+                console.warn(`Removing non-finite scale degree: ${x}`);
+                return false;
+            }
+            // Allow any reasonable value that won't cause audio system issues
+            if (Math.abs(x) > 14400) { // ±10 octaves should be enough for any practical use
+                console.warn(`Removing scale degree outside reasonable range: ${x}`);
+                return false;
+            }
+            return true;
+        });
+
+        // Ensure we have at least one value for equivInterval
+        if (this.settings.scale.length > 0) {
+            this.settings.equivInterval = this.settings.scale.pop() || 1200;
+            // Ensure first value is 0
+            if (this.settings.scale[0] !== 0) {
+                this.settings.scale.unshift(0);
+            }
+        } else {
+            console.error('All scale degrees were invalid. Please check your scale definition.');
+            this.settings.equivInterval = 1200; // Default octave size, but no internal divisions
+            this.settings.scale = [0];
+        }
+
+        // Update UI if needed
+        const equivInput = document.getElementById('equiv-interval') as HTMLInputElement;
+        if (equivInput) {
+            equivInput.value = this.settings.equivInterval.toString();
+        }
     }
 
     public parseScaleColors(): void {
@@ -571,6 +647,65 @@ export class SettingsManager {
         }
     }
 
+    // Check preset selection and handle initial state
+    public checkPreset(_init: number): void {
+        // Always hide settings dialog on load
+        const settingsDialog = document.getElementById('settings-dialog');
+        if (settingsDialog) {
+            settingsDialog.style.display = 'none';
+        }
+
+        // First check for URL parameters
+        if (window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            const paramObj: any = {};
+            params.forEach((value, key) => {
+                try {
+                    paramObj[key] = decodeURIComponent(value);
+                } catch (e) {
+                    paramObj[key] = value;
+                }
+            });
+            
+            // Update form with URL parameters
+            this.updateFromPreset(paramObj);
+            
+            // Try to find and select matching preset in dropdown based on scale content
+            const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
+            if (mselect && paramObj.scale) {
+                const scaleContent = decodeURIComponent(paramObj.scale);
+                for (let i = 0; i < mselect.options.length; i++) {
+                    const option = mselect.options[i];
+                    try {
+                        const parameters = JSON.parse(option.value);
+                        if (parameters.scale && parameters.scale.join('\n') === scaleContent) {
+                            mselect.selectedIndex = i;
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn('Error parsing preset parameters:', e);
+                    }
+                }
+            }
+
+            // Update keyboard display
+            this.updateKeyboardDisplay();
+            return;
+        }
+
+        // If no URL parameters, load default preset
+        this.loadDefaultPreset();
+        this.updateKeyboardDisplay();
+    }
+
+    // Reset preset selection
+    public noPreset(): void {
+        const quicklinks = document.getElementById('quicklinks') as HTMLSelectElement;
+        if (quicklinks) {
+            quicklinks.selectedIndex = 0;
+        }
+    }
+
     // Populate the quicklinks dropdown with presets from JSON
     private populatePresetDropdown(): void {
         const quicklinks = document.getElementById('quicklinks') as HTMLSelectElement;
@@ -596,13 +731,18 @@ export class SettingsManager {
             quicklinks.appendChild(optgroup);
         });
 
-        // Add change handler to update form values without immediate navigation
+        // Add change handler to update form values and URL
         quicklinks.addEventListener('change', (event) => {
             const select = event.target as HTMLSelectElement;
             if (select.selectedIndex > 0) { // If not "Choose Preset"
                 try {
                     const parameters = JSON.parse(select.value);
                     this.updateFromPreset(parameters);
+                    
+                    // Update URL to include preset name
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('preset', encodeURIComponent(select.options[select.selectedIndex].text));
+                    window.history.replaceState({}, '', url.toString());
                 } catch (error) {
                     console.error('Error applying preset:', error);
                 }
@@ -611,7 +751,13 @@ export class SettingsManager {
     }
 
     // Update settings from preset parameters
-    private updateFromPreset(parameters: any): void {
+    public updateFromPreset(parameters: any): void {
+        // Always ensure settings dialog is hidden
+        const settingsDialog = document.getElementById('settings-dialog');
+        if (settingsDialog) {
+            settingsDialog.style.display = 'none';
+        }
+
         // Update form fields with preset values
         Object.entries(parameters).forEach(([key, value]) => {
             const element = document.getElementById(key) as HTMLInputElement;
@@ -629,9 +775,16 @@ export class SettingsManager {
         // Update note configuration
         this.updateNoteConfigFromPreset(parameters);
 
-        // Update URL without navigation
-        this.changeURL();
-        
+        // Parse scale if it exists
+        if (parameters.scale) {
+            const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
+            if (scaleElement) {
+                scaleElement.value = typeof parameters.scale === 'string' ? 
+                    parameters.scale : parameters.scale.join('\n');
+                this.parseScale();
+            }
+        }
+
         // Trigger UI updates
         this.hideRevealNames();
         this.hideRevealColors();
@@ -641,6 +794,38 @@ export class SettingsManager {
             (document.getElementById('symbolic-chord-notation') as HTMLInputElement).checked = 
                 parameters.symbolic_chord_notation === 'true';
         }
+
+        // Update dimensions and rotation matrix
+        this.updateDimensions();
+        this.updateRotationMatrix();
+
+        // Redraw the grid
+        if (this.settings.canvas && this.settings.context) {
+            this.settings.context.clearRect(0, 0, this.settings.canvas.width, this.settings.canvas.height);
+            drawGrid();
+        }
+    }
+
+    // Load the default Lumatone preset
+    public loadDefaultPreset(): boolean {
+        const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
+        if (!mselect) return false;
+
+        // Find the Lumatone preset
+        for (let i = 0; i < mselect.options.length; i++) {
+            if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
+                mselect.selectedIndex = i;
+                try {
+                    const parameters = JSON.parse(mselect.value);
+                    this.updateFromPreset(parameters);
+                    return true;
+                } catch (error) {
+                    console.error('Error applying default preset:', error);
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     // Update note configuration from preset parameters
@@ -711,51 +896,36 @@ export class SettingsManager {
         this.initNoteConfig();
     }
 
-    // Check preset selection
-    public checkPreset(_init: number): void {
-        // First check for URL parameters
-        if (window.location.search) {
-            const params = new URLSearchParams(window.location.search);
-            const paramObj: any = {};
-            params.forEach((value, key) => {
-                paramObj[key] = value;
-            });
-            this.updateNoteConfigFromPreset(paramObj);
-            return; // Don't apply preset if we have URL parameters
-        }
-
-        // Only apply preset if no URL parameters exist
-        const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
-        if (!mselect) return;
-
-        // Find and select the Lumatone preset
-        for (let i = 0; i < mselect.options.length; i++) {
-            if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
-                mselect.selectedIndex = i;
-                // Trigger the change event to apply the preset
-                mselect.dispatchEvent(new Event('change'));
-                return;
+    public changeURL(): void {
+        const url = new URL(window.location.pathname, window.location.origin);
+        const quicklinks = document.getElementById('quicklinks') as HTMLSelectElement;
+        
+        // Add preset name if one is selected
+        if (quicklinks && quicklinks.selectedIndex > 0) {
+            const selectedOption = quicklinks.options[quicklinks.selectedIndex];
+            url.searchParams.set('preset', encodeURIComponent(selectedOption.text));
+            
+            // Also add the preset's parameters to ensure they're preserved
+            try {
+                const parameters = JSON.parse(selectedOption.value);
+                Object.entries(parameters).forEach(([key, value]) => {
+                    if (Array.isArray(value)) {
+                        url.searchParams.set(key, encodeURIComponent(value.join('\n')));
+                    } else {
+                        url.searchParams.set(key, encodeURIComponent(String(value)));
+                    }
+                });
+            } catch (e) {
+                console.warn('Error parsing preset parameters:', e);
             }
         }
-    }
-
-    // Reset preset selection
-    public noPreset(): void {
-        const quicklinks = document.getElementById('quicklinks') as HTMLSelectElement;
-        if (quicklinks) {
-            quicklinks.selectedIndex = 0;
-        }
-    }
-
-    public changeURL(): void {
-        let url = window.location.pathname + "?";
 
         function getElementValue(id: string): string {
             const element = document.getElementById(id) as HTMLInputElement;
             return element ? (element.type === 'checkbox' ? element.checked.toString() : element.value) : '';
         }
 
-        // Add all parameters to URL
+        // Add modified parameters to URL
         const params = [
             "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
             "instrument", "enum", "equivSteps", "spectrum_colors",
@@ -764,21 +934,26 @@ export class SettingsManager {
             "toggle_mode"
         ];
 
-        url += params.map(param => `${param}=${getElementValue(param)}`).join('&');
+        params.forEach(param => {
+            const value = getElementValue(param);
+            if (value) {
+                url.searchParams.set(param, encodeURIComponent(value));
+            }
+        });
 
         // Add scale, names, and note_colors
         ["scale", "names", "note_colors"].forEach(param => {
             const value = getElementValue(param);
             if (value) {
-                url += `&${param}=${encodeURIComponent(value)}`;
+                url.searchParams.set(param, encodeURIComponent(value));
             }
         });
 
-        // Find scl file description for the page title
+        // Update page title from scale description
         const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
         if (scaleElement) {
             const scaleLines = scaleElement.value.split('\n');
-            let description = "Terpstra Keyboard WebApp";
+            let description = "Temper";
 
             for (const line of scaleLines) {
                 if (line.match(/[a-zA-Z]+/) && !line.match(/^!/)) {
@@ -790,6 +965,81 @@ export class SettingsManager {
             document.title = description;
         }
 
-        window.history.replaceState({}, '', url);
+        window.history.replaceState({}, '', url.toString());
+    }
+
+    // Initialize settings
+    public initialize(): void {
+        // Initialize settings object
+        this.settings = { ...defaultSettings };
+
+        // Initialize canvas
+        this.initializeCanvas();
+
+        // Try to load settings from URL parameters first
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.toString()) {
+            const parameters: { [key: string]: string } = {};
+            urlParams.forEach((value, key) => {
+                parameters[key] = value;
+            });
+            this.updateFromPreset(parameters);
+        } else {
+            // If no URL parameters, load default preset
+            this.loadDefaultPreset();
+        }
+
+        // Set up event listeners for form elements
+        const pitchTypeSelect = document.getElementById('pitch-type') as HTMLSelectElement;
+        if (pitchTypeSelect) {
+            pitchTypeSelect.addEventListener('change', () => this.handlePitchTypeChange());
+        }
+
+        const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
+        if (octaveSlider) {
+            octaveSlider.addEventListener('input', () => this.handleCentralOctaveChange());
+        }
+
+        const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
+        if (colorVisionSelect) {
+            colorVisionSelect.addEventListener('change', () => this.updateColorVisionMode());
+        }
+
+        const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
+        if (saturationSlider) {
+            saturationSlider.addEventListener('input', () => this.updateColorSaturation());
+        }
+
+        // Set up checkbox event listeners
+        const checkboxes = ['no_labels', 'spectrum_colors', 'enum', 'show_all_notes', 
+                          'show_intervals', 'invert-updown', 'symbolic-chord-notation', 'toggle_mode'];
+        checkboxes.forEach(id => {
+            const checkbox = document.getElementById(id) as HTMLInputElement;
+            if (checkbox) {
+                checkbox.addEventListener('change', () => this.updateKeyboardDisplay());
+            }
+        });
+
+        // Set up text input event listeners
+        const textInputs = ['fundamental', 'rSteps', 'urSteps', 'hexSize', 'rotation', 'equivSteps'];
+        textInputs.forEach(id => {
+            const input = document.getElementById(id) as HTMLInputElement;
+            if (input) {
+                input.addEventListener('change', () => {
+                    this.loadFromForm();
+                    this.updateDimensions();
+                    this.updateKeyboardDisplay();
+                });
+            }
+        });
+
+        // Initialize note configuration
+        this.initNoteConfig();
+
+        // Load presets
+        this.loadPresets();
+
+        // Initial keyboard display update
+        this.updateKeyboardDisplay();
     }
 } 

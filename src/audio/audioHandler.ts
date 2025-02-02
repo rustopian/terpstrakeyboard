@@ -104,11 +104,12 @@ export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNod
   }
 }
 
-export function getMidiFromCoords(coords: Point, rSteps: number, urSteps: number, octaveOffset: number = 0): number {
-  return 60 + // C4 base note
-    (octaveOffset * 12) + // Apply octave offset
-    coords.x * rSteps +
-    coords.y * urSteps;
+export function getMidiFromCoords(coords: Point, rSteps: number, urSteps: number, octaveOffset: number = 0, equivSteps: number): number {
+  const note = coords.x * rSteps + coords.y * urSteps;
+  const equivMultiple = Math.floor(note / equivSteps);
+  const baseOctave = equivMultiple + octaveOffset + 4; // Same as hex display
+  const reducedNote = ((note % equivSteps) + equivSteps) % equivSteps;
+  return 60 + (reducedNote) + ((baseOctave - 4) * equivSteps);
 }
 
 export async function loadInstrumentSamples(): Promise<void> {

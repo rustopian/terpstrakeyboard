@@ -72,20 +72,134 @@ const getData = new QueryData();
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
-    // Initialize canvas and context
-    settingsManager.initializeCanvas();
-    settings = settingsManager.getSettings();
+    console.log("[DEBUG] Starting DOMContentLoaded initialization...");
+    
+    // Hide settings dialog and landing page immediately
+    console.log("[DEBUG] Hiding settings dialog and landing page...");
+    const landingPage = document.getElementById("landing-page");
+    const overlay = document.querySelector('.modal-overlay');
+    const settingsButton = document.getElementById('settings-button');
+    
+    if (landingPage) landingPage.style.display = "none";
+    if (overlay) overlay.classList.remove('active');
+    if (settingsButton) settingsButton.style.display = 'block';
+    document.body.style.overflow = 'hidden';
 
-    // Initialize hex utilities with current settings
+    // Show keyboard element immediately
+    console.log("[DEBUG] Showing keyboard element...");
+    const keyboard = document.getElementById("keyboard");
+    if (keyboard) {
+        keyboard.style.display = "block";
+        keyboard.style.visibility = "visible";
+        keyboard.style.opacity = "1";
+        console.log("[DEBUG] Keyboard element shown");
+    } else {
+        console.error("[DEBUG] Could not find keyboard element!");
+    }
+
+    // Initialize canvas and context first
+    console.log("[DEBUG] Initializing canvas...");
+    try {
+        settingsManager.initializeCanvas();
+        settings = settingsManager.getSettings();
+    } catch (error) {
+        console.error("[DEBUG] Error initializing canvas:", error);
+    }
+
+    // Load presets BEFORE initializing hex utils and display utils
+    console.log("[DEBUG] Loading presets...");
+    try {
+        await settingsManager.loadPresets();
+        console.log("[DEBUG] Presets loaded successfully");
+    } catch (error) {
+        console.error("[DEBUG] Error loading presets:", error);
+        // Don't show settings on error, just log it
+    }
+
+    // Apply URL parameters or default preset
+    console.log("[DEBUG] Applying settings from URL or default preset...");
+    if (window.location.search) {
+        console.log("[DEBUG] URL parameters found, applying preset...");
+        // Apply preset from URL parameters
+        const presetId = getData.preset ? parseInt(getData.preset) : 16;  // Default to 16 if not specified
+        console.log("[DEBUG] Using preset ID:", presetId);
+        try {
+            settingsManager.checkPreset(presetId);
+            settings = settingsManager.getSettings();
+            console.log("[DEBUG] Settings updated from preset");
+        } catch (error) {
+            console.error("[DEBUG] Error applying preset:", error);
+            // Don't show settings on error, just log it
+        }
+    } else {
+        console.log("[DEBUG] No URL parameters, loading default preset...");
+        // No URL parameters, load default preset
+        const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
+        if (mselect) {
+            // Find and select the Lumatone preset
+            for (let i = 0; i < mselect.options.length; i++) {
+                if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
+                    mselect.selectedIndex = i;
+                    // Apply the preset
+                    try {
+                        const parameters = JSON.parse(mselect.value);
+                        settingsManager.updateFromPreset(parameters);
+                        settings = settingsManager.getSettings();
+                        console.log("[DEBUG] Default preset applied successfully");
+                    } catch (error) {
+                        console.error("[DEBUG] Error applying default preset:", error);
+                        // Don't show settings on error, just log it
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Initialize hex utilities with settings from preset
+    console.log("[DEBUG] Initializing hex utilities...");
     initHexUtils(settings);
     
     // Initialize display utilities
+    console.log("[DEBUG] Initializing display utilities...");
     initDisplayUtils(settings);
     
-    // Initialize audio handler with settings first
-    initAudioHandler(settings);
-    
+    // Initialize audio system - but don't try to start it yet
+    console.log("[DEBUG] Creating audio context...");
+    const ctx = await initAudio();
+    if (ctx) {
+        settings.audioContext = ctx;
+        console.log("[DEBUG] Audio context created in suspended state:", ctx.state);
+    }
+
+    // Add user interaction handler to start audio
+    console.log("[DEBUG] Setting up user interaction handler for audio...");
+    const startAudioHandler = async () => {
+        console.log("[DEBUG] User interaction detected, starting audio...");
+        if (settings.audioContext && settings.audioContext.state === 'suspended') {
+            try {
+                await settings.audioContext.resume();
+                console.log("[DEBUG] Audio context resumed:", settings.audioContext.state);
+                await loadInstrumentSamples();
+                console.log("[DEBUG] Instrument samples loaded");
+                
+                // Remove the event listeners once audio is started
+                document.removeEventListener('click', startAudioHandler);
+                document.removeEventListener('keydown', startAudioHandler);
+                document.removeEventListener('touchstart', startAudioHandler);
+            } catch (error) {
+                console.error("[DEBUG] Error starting audio:", error);
+            }
+        }
+    };
+
+    // Add event listeners for user interaction
+    document.addEventListener('click', startAudioHandler);
+    document.addEventListener('keydown', startAudioHandler);
+    document.addEventListener('touchstart', startAudioHandler);
+
     // Initialize event handlers
+    console.log("[DEBUG] Initializing event handlers...");
     initEventHandlers(settings);
     
     // Add settings button handler
@@ -99,54 +213,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Initialize scroll area
+    console.log("[DEBUG] Initializing scroll area...");
     initScrollArea();
 
-    // Load presets
-    await settingsManager.loadPresets();
-
-    // Apply URL parameters or default preset
-    if (window.location.search) {
-        const keyboard = document.getElementById("keyboard");
-        const landingPage = document.getElementById("landing-page");
-        const settingsButton = document.getElementById("settings-button");
-        
-        if (keyboard) keyboard.style.display = "block";
-        if (landingPage) landingPage.style.display = "none";
-        if (settingsButton) settingsButton.style.display = "block";
-        
-        // Initialize audio system after UI is ready
-        const ctx = await initAudio();
-        if (ctx) {
-            settings.audioContext = ctx;
-            console.log("[DEBUG] Audio context initialized:", ctx.state);
-            
-            // Resume the audio context since it might be suspended
-            try {
-                await ctx.resume();
-                console.log("[DEBUG] Audio context resumed:", ctx.state);
-                
-                // Load instrument samples only after audio context is ready
-                const instrumentSelect = document.getElementById('instrument') as HTMLSelectElement;
-                if (instrumentSelect) {
-                    instrumentSelect.value = getData.instrument ?? "organ";
-                    await loadInstrumentSamples();
-                }
-            } catch (error) {
-                console.error("[DEBUG] Error resuming audio context:", error);
-            }
-        }
-        
-        settingsManager.checkPreset(16);
-        setTimeout(() => { goKeyboard(); }, 1500);
-    } else {
-        showSettings();
+    // Add form submission handler
+    const settingsForm = document.getElementById('settingsForm') as HTMLFormElement;
+    if (settingsForm) {
+        settingsForm.onsubmit = (event: Event) => {
+            event.preventDefault();
+            goKeyboard();
+            return false;
+        };
     }
 
-    // Initialize note configuration
-    settingsManager.initNoteConfig();
-
-    // Initialize all event listeners
-    initializeEventListeners();
+    console.log("[DEBUG] All setup complete, calling goKeyboard...");
+    goKeyboard();
 });
 
 // Initialize all event listeners
@@ -224,6 +305,30 @@ function initializeEventListeners(): void {
             }
         }
     });
+
+    // Add preset change handler
+    const presetSelect = document.getElementById('quicklinks') as HTMLSelectElement;
+    if (presetSelect) {
+        presetSelect.addEventListener('change', () => {
+            try {
+                const parameters = JSON.parse(presetSelect.value);
+                settingsManager.updateFromPreset(parameters);
+                settings = settingsManager.getSettings();
+                initHexUtils(settings);
+                initDisplayUtils(settings);
+                // Update keyboard display immediately for live preview
+                const keyboard = document.getElementById("keyboard");
+                if (keyboard) {
+                    keyboard.style.display = "block";
+                    keyboard.style.visibility = "visible";
+                    keyboard.style.opacity = "1";
+                }
+                drawGrid();
+            } catch (error) {
+                console.error('Error applying preset:', error);
+            }
+        });
+    }
 }
 
 // Add scroll area functionality with edge detection
@@ -271,20 +376,12 @@ function onEnabled(): void {
     window.WebMidi.outputs.forEach((output: any) => addMidiOption(output.name));
   }
 
-  // Initialize keyboard on load
-  if (init_keyboard_onload) {
-    // Hide landing page
-    const landingPage = document.getElementById('landing-page');
-    if (landingPage) {
-      landingPage.style.display = 'none';
-    }
-
-    const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-    if (instrumentSelect) {
-      instrumentSelect.value = getData.instrument ?? "organ";
-    }
-    setTimeout(() => { goKeyboard(); }, 1500);
+  // Always initialize keyboard immediately
+  const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
+  if (instrumentSelect) {
+    instrumentSelect.value = getData.instrument ?? "organ";
   }
+  setTimeout(() => { goKeyboard(); }, 1500);
 
   // Add beforeunload handler to clean up MIDI
   window.addEventListener('beforeunload', (_event: BeforeUnloadEvent) => {
@@ -297,76 +394,6 @@ function onEnabled(): void {
     }
   });
 }
-
-// Check\set preset
-let init_keyboard_onload = true;
-if (decodeURIComponent(window.location.search) === '') {
-  init_keyboard_onload = false;
-}
-
-settingsManager.checkPreset(16);
-
-// Fill in form
-const settingsForm = document.getElementById('settingsForm') as HTMLFormElement;
-if (settingsForm) {
-  settingsForm.onsubmit = goKeyboard;
-}
-
-function setInputValue(id: string, defaultValue: any): void {
-  const element = document.getElementById(id) as HTMLInputElement;
-  if (element) {
-    if (id in getData) {
-      if (element.type === 'checkbox') {
-        element.checked = JSON.parse(getData[id]);
-      } else {
-        element.value = getData[id];
-      }
-    } else {
-      if (element.type === 'checkbox') {
-        element.checked = defaultValue;
-      } else {
-        element.value = defaultValue;
-      }
-    }
-  }
-}
-
-setInputValue("fundamental", 263.09212);
-setInputValue("rSteps", 5);
-setInputValue("urSteps", 2);
-setInputValue("hexSize", 50);
-setInputValue("rotation", 343.897886248);
-setInputValue("enum", false);
-setInputValue("equivSteps", 31);
-setInputValue("spectrum_colors", false);
-setInputValue("fundamental_color", '#55ff55');
-setInputValue("no_labels", false);
-setInputValue("invert-updown", false);
-
-if ("scale" in getData && getData.scale) {
-  const scaleElement = document.getElementById("scale") as HTMLInputElement;
-  if (scaleElement) {
-    scaleElement.value = getData.scale[0];
-  }
-}
-
-if ("names" in getData && getData.names) {
-  const namesElement = document.getElementById("names") as HTMLInputElement;
-  if (namesElement) {
-    namesElement.value = getData.names[0];
-  }
-}
-
-if ("note_colors" in getData && getData.note_colors) {
-  const noteColorsElement = document.getElementById("note_colors") as HTMLInputElement;
-  if (noteColorsElement) {
-    noteColorsElement.value = getData.note_colors[0];
-  }
-}
-
-settingsManager.hideRevealNames();
-settingsManager.hideRevealColors();
-settingsManager.hideRevealEnum();
 
 function resizeHandler(): void {
   settingsManager.updateDimensions();
@@ -408,76 +435,63 @@ function back(): void {
   showSettings();
 }
 
+// Update goKeyboard to not try to start audio immediately
 function goKeyboard(): boolean {
-  settingsManager.changeURL();
-  console.log("[DEBUG] Starting goKeyboard...");
+    // Update URL before anything else
+    settingsManager.changeURL();
+    console.log("[DEBUG] Starting keyboard initialization...");
 
-  // Hide settings and show keyboard
-  hideSettings();
-  
-  // Initialize canvas using SettingsManager
-  settingsManager.initializeCanvas();
+    // Hide settings and show keyboard
+    hideSettings();
+    
+    // Initialize canvas using SettingsManager
+    settingsManager.initializeCanvas();
 
-  // Reset all pressed states
-  settings.pressedKeys = [];
-  settings.isMouseDown = false;
-  settings.isTouchDown = false;
-  settings.activeHexObjects = [];
-  settings.sustainedNotes = [];
-  settings.sustain = false;
+    // Reset all pressed states
+    settings.pressedKeys = [];
+    settings.isMouseDown = false;
+    settings.isTouchDown = false;
+    settings.activeHexObjects = [];
+    settings.sustainedNotes = [];
+    settings.sustain = false;
 
-  // Initialize audio context if not already initialized
-  if (!settings.audioContext) {
-    const ctx = initAudio();
-    if (ctx) {
-      settings.audioContext = ctx;
-      console.log("[DEBUG] Audio context initialized:", ctx.state);
-      
-      // Resume the audio context since it might be suspended
-      ctx.resume().then(() => {
-        console.log("[DEBUG] Audio context resumed:", ctx.state);
-        // Only load samples after context is running
-        loadInstrumentSamples();
-      }).catch(error => {
-        console.error("[DEBUG] Error resuming audio context:", error);
-      });
-      
-      // Add state change monitoring
-      ctx.onstatechange = () => {
-        console.log("[DEBUG] Audio context state changed to:", ctx.state);
-      };
+    // Load settings from form
+    settingsManager.loadFromForm();
+    settings = settingsManager.getSettings();
+
+    // Parse scale and colors
+    settingsManager.parseScale();
+    settingsManager.parseScaleColors();
+
+    // Initialize display utils
+    initDisplayUtils(settings);
+    // Initialize hex utils
+    initHexUtils(settings);
+
+    // Set up resize handler
+    window.addEventListener('resize', resizeHandler, false);
+    window.addEventListener('orientationchange', resizeHandler, false);
+    resizeHandler();
+
+    // Initialize event handlers
+    console.log("Initializing event handlers with settings:", settings);
+    initEventHandlers(settings);
+
+    // Show keyboard and settings button
+    const keyboard = document.getElementById("keyboard");
+    if (keyboard) {
+        keyboard.style.display = "block";
+        keyboard.style.visibility = "visible";
+        keyboard.style.opacity = "1";
     }
-  } else {
-    // If context already exists, ensure it's running and load samples
-    settings.audioContext.resume().then(() => {
-      console.log("[DEBUG] Existing audio context resumed:", settings.audioContext?.state);
-      loadInstrumentSamples();
-    }).catch((error: any) => {
-      console.error("[DEBUG] Error resuming existing audio context:", error);
-    });
-  }
 
-  // Load settings from form
-  settingsManager.loadFromForm();
-  settings = settingsManager.getSettings();
+    const settingsButton = document.getElementById('settings-button');
+    if (settingsButton) {
+        settingsButton.style.display = 'block';
+    }
 
-  // Parse scale and colors
-  settingsManager.parseScale();
-  settingsManager.parseScaleColors();
+    // Force a redraw
+    drawGrid();
 
-  // Initialize display utils
-  initDisplayUtils(settings);
-  // Initialize hex utils
-  initHexUtils(settings);
-
-  // Set up resize handler
-  window.addEventListener('resize', resizeHandler, false);
-  window.addEventListener('orientationchange', resizeHandler, false);
-  resizeHandler();
-
-  // Initialize event handlers
-  console.log("Initializing event handlers with settings:", settings);
-  initEventHandlers(settings);
-
-  return false;
+    return false;
 }

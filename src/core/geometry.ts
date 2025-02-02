@@ -1,4 +1,4 @@
-// Geometry utility functions and classes for the Terpstra Keyboard WebApp
+// Geometry utility functions and classes for the Temper
 
 export class Point {
   constructor(public x: number, public y: number) {}

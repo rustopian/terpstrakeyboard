@@ -1,4 +1,4 @@
-// Event handling functions for the Terpstra Keyboard WebApp
+// Event handling functions for the Temper
 import { hexCoordsToCents, getHexCoordsAt } from '../grid/hexUtils';
 import { Point } from '../core/geometry';
 import { centsToColor, drawHex } from '../grid/displayUtils';
@@ -188,7 +188,7 @@ function onKeyDown(e: KeyboardEvent): void {
       && state.pressedKeys.indexOf(e.keyCode) === -1) {
     
     const hexCoords = settings.keyCodeToCoords[e.keyCode];
-    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
 
     if (settings.toggle_mode) {
       // In toggle mode, just toggle the note
@@ -308,7 +308,7 @@ const mouseDown = (e: MouseEvent) => {
   
   if (settings.toggle_mode) {
     // In toggle mode, just toggle the note
-    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
     handleNote(hexCoords, !isNoteActive(note));
   } else {
     // In normal mode, activate the note
@@ -448,7 +448,7 @@ function handleTouch(e: TouchEvent): void {
     if (e.type === 'touchstart') {
       const screenCoords = getUnifiedPointerPosition(e.touches[0]);
       const hexCoords = getHexCoordsAt(screenCoords);
-      const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset);
+      const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
       handleNote(hexCoords, !isNoteActive(note));
     }
     return;
@@ -574,7 +574,7 @@ export function handleHexClick(event: MouseEvent | TouchEvent, hexCoords: { x: n
   if (!settings) return;
 
   const point = new Point(hexCoords.x, hexCoords.y);
-  const note = getMidiFromCoords(point, settings.rSteps, settings.urSteps, settings.octaveOffset);
+  const note = getMidiFromCoords(point, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
   
   if (settings.toggle_mode) {
     // In toggle mode, just toggle the note

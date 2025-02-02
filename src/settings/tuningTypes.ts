@@ -1,4 +1,4 @@
-// Type definitions for tuning systems in the Terpstra Keyboard WebApp
+// Type definitions for tuning systems in the Temper
 
 interface IntervalData {
   intervalName: string;

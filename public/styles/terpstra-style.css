@@ -160,6 +160,7 @@ select#quicklinks {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   overflow-y: auto;
   z-index: 1002;
+  display: none;  /* Hide by default */
 }
 
 .tabs {

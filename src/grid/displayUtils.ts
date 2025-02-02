@@ -1,4 +1,4 @@
-// Display utility functions for the Terpstra Keyboard WebApp
+// Display utility functions for the Temper
 import { Point } from '../core/geometry';
 import { hexCoordsToScreen, getHexVertices, hexCoordsToCents } from './hexUtils';
 import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils';
