@@ -103,36 +103,34 @@ export function removeActiveNote(hex: ActiveHex): void {
 export function releaseAllNotes(): void {
   if (!settings) return;
   
-  console.log(`[DEBUG] Releasing all notes: [${Array.from(activeNotes).join(', ')}]`);
+  console.log(`[DEBUG] Releasing all notes: [${Array.from(activeNotes).join(', ')}, toggled: ${Array.from(toggledNotes).join(', ')}]`);
   
-  // Release all notes through the note event manager
+  // Release all active notes
   for (const note of activeNotes) {
-    // Convert note number back to coordinates
     const coords = new Point(
       Math.floor(note / settings.rSteps),
       note % settings.rSteps
     );
-    
-    console.log(`[DEBUG] Release note ${note} -> coords(${coords.x},${coords.y})`);
-    
-    // Calculate frequency from coordinates
-    const centsObj = hexCoordsToCents(coords);
-    const frequency = settings.fundamental * Math.pow(2, centsObj.cents / 1200);
-    
-    // Calculate MIDI note only for MIDI output
-    const midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
-    
-    noteEventManager.handleNoteEvent({
-      type: 'noteOff',
-      coords,
-      frequency,
-      midiNote
-    });
+    const hex = new ActiveHex(coords);
+    hex.noteOff();
+  }
+  
+  // Release all toggled notes
+  for (const note of toggledNotes) {
+    const coords = new Point(
+      Math.floor(note / settings.rSteps),
+      note % settings.rSteps
+    );
+    const hex = new ActiveHex(coords);
+    hex.noteOff();
   }
 
   // Clear tracking sets
   activeNotes.clear();
   toggledNotes.clear();
+  
+  // Also tell noteEventManager to release everything
+  noteEventManager.releaseAll();
   
   // Update chord display
   updateChordDisplay([]);
@@ -151,21 +149,54 @@ export function getActiveNotes(): number[] {
 export function activateNote(note: number): void {
   if (!settings) return;
   console.log(`[DEBUG] Activating note: ${note}`);
+  
+  // Convert note number back to coordinates for audio handling
+  const coords = new Point(
+    Math.floor(note / settings.rSteps),
+    note % settings.rSteps
+  );
+  
   if (settings.toggle_mode) {
     if (toggledNotes.has(note)) {
+      // If note is already toggled on, turn it off
       toggledNotes.delete(note);
+      // Create an ActiveHex instance to handle the note off
+      const hex = new ActiveHex(coords);
+      hex.noteOff();
     } else {
+      // Toggle note on
       toggledNotes.add(note);
+      // Create an ActiveHex instance to handle the note on
+      const hex = new ActiveHex(coords);
+      hex.noteOn();
     }
   } else {
     activeNotes.add(note);
+    // Create an ActiveHex instance to handle the note on
+    const hex = new ActiveHex(coords);
+    hex.noteOn();
   }
   updateChordDisplay(getActiveNotes());
 }
 
 export function deactivateNote(note: number): void {
+  if (!settings) return;
   console.log(`[DEBUG] Deactivating note: ${note}`);
-  activeNotes.delete(note);
+  
+  // Only handle deactivation in non-toggle mode
+  if (!settings.toggle_mode) {
+    if (activeNotes.has(note)) {
+      activeNotes.delete(note);
+      // Convert note number back to coordinates
+      const coords = new Point(
+        Math.floor(note / settings.rSteps),
+        note % settings.rSteps
+      );
+      // Create an ActiveHex instance to handle the note off
+      const hex = new ActiveHex(coords);
+      hex.noteOff();
+    }
+  }
   updateChordDisplay(getActiveNotes());
 }
 

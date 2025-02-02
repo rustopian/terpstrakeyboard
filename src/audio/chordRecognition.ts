@@ -145,7 +145,7 @@ function recognizeChord(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | 
 }
 
 // Add this new function to convert step numbers back to note names
-function getNoteName(step: number, tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): string {
+function getNoteName(step: number): string {
   const settings = (window as any).settings;
   if (!settings || !settings.names) return '';
   
@@ -203,7 +203,7 @@ function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO 
       if (intervals.length === sortedPattern.length && 
           intervals.every((interval, idx) => interval === sortedPattern[idx])) {
         
-        const rootNoteName = getNoteName(potentialRoot, tuningSystem);
+        const rootNoteName = getNoteName(potentialRoot);
         const symbol = Array.isArray(spelling) ? 
           `${rootNoteName} ${chordName}` : 
           rootNoteName + spelling.symbol.replace(/^C/, '');
