@@ -401,10 +401,13 @@ function getUnifiedPointerPosition(e: MouseEvent | Touch): Point {
   
   const rect = canvas.getBoundingClientRect();
   
-  // Don't multiply by DPI here - the canvas context transform already handles the scaling
+  // The canvas height is viewport height - 50px to account for the scroll area at the top.
+  // Touch/mouse coordinates (clientX/Y) are relative to the full viewport (including scroll area),
+  // while our canvas coordinate system is relative to the shorter canvas height.
+  // We need to subtract 50px from the Y coordinate to align the two coordinate systems.
   return new Point(
     e.clientX - rect.left,
-    e.clientY - rect.top
+    e.clientY - rect.top - 50
   );
 }
 
