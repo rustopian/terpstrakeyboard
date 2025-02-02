@@ -135,6 +135,7 @@ export interface AudioRequired {
   sampleBuffer: AudioBuffer | null;
   fadeoutTime: number;
   scale: number[];
+  toggle_mode: boolean;
 }
 
 /**

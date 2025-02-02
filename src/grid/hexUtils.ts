@@ -1,7 +1,6 @@
 // Hex grid utility functions for the Temper
 import { Point } from '../core/geometry';
 import { applyMatrixToPoint } from '../core/geometry';
-import { roundTowardZero } from '../core/geometry';
 import { CentsResult } from '../core/types';
 import type { GridSettings } from '../settings/SettingsTypes';
 import { hasGridProps } from '../settings/SettingsTypes';
@@ -38,13 +37,21 @@ export function hexCoordsToCents(coords: Point): CentsResult {
     return { cents: 0, reducedSteps: 0 };
   }
   const distance = coords.x * settings.rSteps + coords.y * settings.urSteps;
-  let octs = Math.floor(distance / settings.scale.length);
-  let reducedSteps = distance % settings.scale.length;
+  
+  // For negative notes, we need to handle the floor division differently
+  // to ensure proper wrapping within the octave
+  const equivSteps = settings.scale.length;
+  const octs = Math.floor(distance / equivSteps);
+  
+  // Calculate reduced steps with proper handling of negative values
+  let reducedSteps = distance % equivSteps;
   if (reducedSteps < 0) {
-    reducedSteps += settings.scale.length;
-    octs -= 1;
+    reducedSteps += equivSteps;
   }
+  
+  // Calculate cents value
   const cents = (octs + (settings.octaveOffset || 0)) * settings.equivInterval + settings.scale[reducedSteps];
+  
   return { cents, reducedSteps };
 }
 

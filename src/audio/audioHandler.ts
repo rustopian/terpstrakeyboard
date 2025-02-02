@@ -77,7 +77,13 @@ export function playNote(freq: number): { source: AudioBufferSourceNode; gainNod
   
   // Calculate playback rate
   const baseFreq = getBaseFrequency(buffer.sampleRate);
-  source.playbackRate.value = freq / baseFreq;
+  const playbackRate = freq / baseFreq;
+  source.playbackRate.value = playbackRate;
+  
+  console.log(`[DEBUG] Audio playback:
+    frequency=${freq.toFixed(2)}Hz
+    baseFreq=${baseFreq}Hz
+    playbackRate=${playbackRate.toFixed(3)}`);
   
   const gainNode = settings.audioContext.createGain();
   source.connect(gainNode);
@@ -106,10 +112,22 @@ export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNod
 
 export function getMidiFromCoords(coords: Point, rSteps: number, urSteps: number, octaveOffset: number = 0, equivSteps: number): number {
   const note = coords.x * rSteps + coords.y * urSteps;
+  
+  // For negative notes, we need to handle the floor division differently
+  // to ensure proper wrapping within the octave
   const equivMultiple = Math.floor(note / equivSteps);
-  const baseOctave = equivMultiple + octaveOffset + 4; // Same as hex display
-  const reducedNote = ((note % equivSteps) + equivSteps) % equivSteps;
-  return 60 + (reducedNote) + ((baseOctave - 4) * equivSteps);
+  const baseOctave = equivMultiple + octaveOffset + 4;
+  
+  // For negative notes, we need to adjust the modulo to wrap correctly
+  let reducedNote = note % equivSteps;
+  if (reducedNote < 0) {
+    reducedNote += equivSteps;
+  }
+  
+  // Calculate MIDI note number
+  const midiNote = 60 + reducedNote + ((baseOctave - 4) * 12);
+  
+  return midiNote;
 }
 
 export async function loadInstrumentSamples(): Promise<void> {

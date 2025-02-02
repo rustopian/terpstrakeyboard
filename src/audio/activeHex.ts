@@ -14,7 +14,8 @@ export function initActiveHex(appSettings: AudioSettings): void {
 export class ActiveHex {
   coords: Point;
   frequency: number;
-  midiNote: number;
+  note: number;  // Raw note number from grid coordinates
+  midiNote: number;  // Only used for MIDI output
   nodeId?: string;
 
   constructor(coords: Point) {
@@ -24,8 +25,25 @@ export class ActiveHex {
     this.coords = coords;
     const centsObj = hexCoordsToCents(coords);
     this.frequency = settings.fundamental * Math.pow(2, centsObj.cents / 1200);
-    console.log(`[DEBUG] Note frequency: ${this.frequency.toFixed(3)} Hz (coords: ${coords.x},${coords.y}, cents: ${centsObj.cents.toFixed(1)})`);
+    
+    // Calculate raw note number from coordinates using the same logic as hexCoordsToCents
+    const distance = coords.x * settings.rSteps + coords.y * settings.urSteps;
+    const equivSteps = settings.scale.length;
+    const octs = Math.floor(distance / equivSteps);
+    
+    // Calculate reduced steps with proper handling of negative values
+    let reducedSteps = distance % equivSteps;
+    if (reducedSteps < 0) {
+      reducedSteps += equivSteps;
+    }
+    
+    // Store the reduced note number for chord display
+    this.note = reducedSteps;
+    
+    // Calculate MIDI note only for MIDI output
     this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
+    
+    console.log(`[DEBUG] Note created: coords(${coords.x},${coords.y}), distance=${distance}, octs=${octs}, reducedSteps=${reducedSteps}, note=${this.note}, cents=${centsObj.cents.toFixed(1)}`);
   }
 
   async noteOn(): Promise<void> {
@@ -41,6 +59,7 @@ export class ActiveHex {
       midiNote: this.midiNote
     });
 
+    console.log(`[DEBUG] Note ON: coords(${this.coords.x},${this.coords.y}), raw note=${this.note}`);
     addActiveNote(this);
   }
 
@@ -58,40 +77,57 @@ export class ActiveHex {
       nodeId: this.nodeId
     });
 
+    console.log(`[DEBUG] Note OFF: coords(${this.coords.x},${this.coords.y}), raw note=${this.note}`);
     removeActiveNote(this);
   }
 }
 
-// Track both held and toggled notes
+// Track both held and toggled notes using raw note numbers
 const activeNotes = new Set<number>();
 const toggledNotes = new Set<number>();
 
 export function addActiveNote(hex: ActiveHex): void {
   if (!settings) return;
-  activeNotes.add(hex.midiNote);
+  activeNotes.add(hex.note);  // Use raw note number
+  console.log(`[DEBUG] Active notes after add: [${Array.from(activeNotes).join(', ')}]`);
   updateChordDisplay(getActiveNotes());
 }
 
 export function removeActiveNote(hex: ActiveHex): void {
   if (!settings) return;
-  activeNotes.delete(hex.midiNote);
+  activeNotes.delete(hex.note);  // Use raw note number
+  console.log(`[DEBUG] Active notes after remove: [${Array.from(activeNotes).join(', ')}]`);
   updateChordDisplay(getActiveNotes());
 }
 
 export function releaseAllNotes(): void {
   if (!settings) return;
   
+  console.log(`[DEBUG] Releasing all notes: [${Array.from(activeNotes).join(', ')}]`);
+  
   // Release all notes through the note event manager
   for (const note of activeNotes) {
-    const coords = getMidiCoords(note);
-    if (coords) {
-      noteEventManager.handleNoteEvent({
-        type: 'noteOff',
-        coords,
-        frequency: getFrequencyForNote(note),
-        midiNote: note
-      });
-    }
+    // Convert note number back to coordinates
+    const coords = new Point(
+      Math.floor(note / settings.rSteps),
+      note % settings.rSteps
+    );
+    
+    console.log(`[DEBUG] Release note ${note} -> coords(${coords.x},${coords.y})`);
+    
+    // Calculate frequency from coordinates
+    const centsObj = hexCoordsToCents(coords);
+    const frequency = settings.fundamental * Math.pow(2, centsObj.cents / 1200);
+    
+    // Calculate MIDI note only for MIDI output
+    const midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
+    
+    noteEventManager.handleNoteEvent({
+      type: 'noteOff',
+      coords,
+      frequency,
+      midiNote
+    });
   }
 
   // Clear tracking sets
@@ -107,11 +143,14 @@ export function isNoteActive(note: number): boolean {
 }
 
 export function getActiveNotes(): number[] {
-  return Array.from(new Set([...activeNotes, ...toggledNotes]));
+  const notes = Array.from(new Set([...activeNotes, ...toggledNotes]));
+  console.log(`[DEBUG] Getting active notes: [${notes.join(', ')}]`);
+  return notes;
 }
 
 export function activateNote(note: number): void {
-  const settings = (window as any).settings;
+  if (!settings) return;
+  console.log(`[DEBUG] Activating note: ${note}`);
   if (settings.toggle_mode) {
     if (toggledNotes.has(note)) {
       toggledNotes.delete(note);
@@ -125,28 +164,9 @@ export function activateNote(note: number): void {
 }
 
 export function deactivateNote(note: number): void {
+  console.log(`[DEBUG] Deactivating note: ${note}`);
   activeNotes.delete(note);
   updateChordDisplay(getActiveNotes());
-}
-
-// Helper functions
-function getMidiCoords(midiNote: number): Point | null {
-  if (!settings) return null;
-  const octave = Math.floor((midiNote - 60) / 12);
-  const remainder = (midiNote - 60) % 12;
-  return new Point(
-    Math.floor(remainder / settings.rSteps),
-    Math.floor(remainder / settings.urSteps)
-  );
-}
-
-function getFrequencyForNote(midiNote: number): number {
-  if (!settings) {
-    console.warn('Settings not initialized for frequency calculation');
-    return 0;
-  }
-  // Use the fundamental from settings and calculate relative to C4 (MIDI 60)
-  return settings.fundamental * Math.pow(2, (midiNote - 60) / 12);
 }
 
 // Initialize release all button handler

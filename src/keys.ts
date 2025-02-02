@@ -1,5 +1,5 @@
 // Import audio functions
-import { initAudio, initAudioHandler, loadInstrumentSamples } from './audio/audioHandler';
+import { initAudio, loadInstrumentSamples } from './audio/audioHandler';
 
 // Import event handling functions
 import { initEventHandlers } from './ui/eventHandler';
@@ -230,108 +230,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log("[DEBUG] All setup complete, calling goKeyboard...");
     goKeyboard();
 });
-
-// Initialize all event listeners
-function initializeEventListeners(): void {
-    // Pitch type change handler
-    document.getElementById('pitch-type')?.addEventListener('change', () => {
-        settingsManager.handlePitchTypeChange();
-        settingsManager.handleCentralOctaveChange();
-        settings = settingsManager.getSettings();
-    });
-
-    // Central octave change handler
-    document.getElementById('central-octave')?.addEventListener('input', () => {
-        settingsManager.handleCentralOctaveChange();
-        settings = settingsManager.getSettings();
-    });
-
-    // Text size handler
-    document.getElementById('text-size')?.addEventListener('input', (event) => {
-        const slider = event.target as HTMLInputElement;
-        settings.textSize = parseFloat(slider.value);
-        settingsManager.updateKeyboardDisplay();
-        settings = settingsManager.getSettings();
-    });
-
-    // Color vision mode handler
-    const colorVisionSelect = document.getElementById('color-vision-mode') as HTMLSelectElement;
-    if (colorVisionSelect) {
-        colorVisionSelect.value = settings.colorVisionMode;
-        colorVisionSelect.addEventListener('change', () => {
-            settingsManager.updateColorVisionMode();
-            settingsManager.updatePreviewButtons();
-            settings = settingsManager.getSettings();
-        });
-    }
-
-    // Color saturation handler
-    const saturationSlider = document.getElementById('color-saturation') as HTMLInputElement;
-    if (saturationSlider) {
-        saturationSlider.addEventListener('input', () => {
-            settingsManager.updateColorSaturation();
-            settingsManager.updatePreviewButtons();
-            settings = settingsManager.getSettings();
-        });
-    }
-
-    // Invert up/down handler
-    const invertUpdownCheckbox = document.getElementById('invert-updown') as HTMLInputElement;
-    if (invertUpdownCheckbox) {
-        invertUpdownCheckbox.addEventListener('change', () => {
-            settings.invert_updown = invertUpdownCheckbox.checked;
-            settingsManager.updatePreviewButtons();
-            settingsManager.updateKeyboardDisplay();
-            settings = settingsManager.getSettings();
-        });
-    }
-
-    // MIDI input handler
-    document.getElementById('midi_input')?.addEventListener('change', (event) => {
-        const checkbox = event.target as HTMLInputElement;
-        settings.midi_enabled = checkbox.checked;
-        if (checkbox.checked) {
-            if (window.WebMidi) {
-                window.WebMidi
-                    .enable()
-                    .then(onEnabled)
-                    .catch((err: Error) => {
-                        console.error("WebMidi enable error:", err);
-                        alert(err);
-                    });
-            }
-        } else {
-            if (window.WebMidi && window.WebMidi.enabled) {
-                window.WebMidi.disable();
-            }
-        }
-    });
-
-    // Add preset change handler
-    const presetSelect = document.getElementById('quicklinks') as HTMLSelectElement;
-    if (presetSelect) {
-        presetSelect.addEventListener('change', () => {
-            try {
-                const parameters = JSON.parse(presetSelect.value);
-                settingsManager.updateFromPreset(parameters);
-                settings = settingsManager.getSettings();
-                initHexUtils(settings);
-                initDisplayUtils(settings);
-                // Update keyboard display immediately for live preview
-                const keyboard = document.getElementById("keyboard");
-                if (keyboard) {
-                    keyboard.style.display = "block";
-                    keyboard.style.visibility = "visible";
-                    keyboard.style.opacity = "1";
-                }
-                drawGrid();
-            } catch (error) {
-                console.error('Error applying preset:', error);
-            }
-        });
-    }
-}
-
 // Add scroll area functionality with edge detection
 function initScrollArea(): void {
     if (scrollManager) {
@@ -357,44 +255,6 @@ window.updateColorSaturation = () => {
     settings = settingsManager.getSettings();
 };
 window.updateKeyboardDisplay = () => settingsManager.updateKeyboardDisplay();
-
-function onEnabled(): void {
-  if (window.WebMidi.outputs) {
-    const midiOutMenu = document.createElement("optgroup");
-    midiOutMenu.setAttribute("label", "MIDI out");
-    const instrumentSelect = document.getElementById("instrument");
-    if (instrumentSelect) {
-      instrumentSelect.appendChild(midiOutMenu);
-    }
-
-    function addMidiOption(e: string): void {
-      const midiOption = document.createElement("option");
-      midiOption.setAttribute("value", e);
-      midiOption.textContent = e;
-      midiOutMenu.appendChild(midiOption);
-    }
-
-    window.WebMidi.outputs.forEach((output: any) => addMidiOption(output.name));
-  }
-
-  // Always initialize keyboard immediately
-  const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-  if (instrumentSelect) {
-    instrumentSelect.value = getData.instrument ?? "organ";
-  }
-  setTimeout(() => { goKeyboard(); }, 1500);
-
-  // Add beforeunload handler to clean up MIDI
-  window.addEventListener('beforeunload', (_event: BeforeUnloadEvent) => {
-    const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-    if (instrumentSelect && window.WebMidi.enabled) {
-      const midiOutput = window.WebMidi.getOutputByName(instrumentSelect.value);
-      if (midiOutput) {
-        midiOutput.sendAllSoundOff();
-      }
-    }
-  });
-}
 
 function resizeHandler(): void {
   settingsManager.updateDimensions();

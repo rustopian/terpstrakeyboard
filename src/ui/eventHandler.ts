@@ -3,7 +3,6 @@ import { hexCoordsToCents, getHexCoordsAt } from '../grid/hexUtils';
 import { Point } from '../core/geometry';
 import { centsToColor, drawHex } from '../grid/displayUtils';
 import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote, activateNote, deactivateNote, isNoteActive, releaseAllNotes } from '../audio/activeHex';
-import { getMidiFromCoords } from '../audio/audioHandler';
 import type { EventHandlerSettings } from '../settings/SettingsTypes';
 import { hasEventHandlerProps } from '../settings/SettingsTypes';
 
@@ -54,19 +53,6 @@ export function initEventHandlers(appSettings: unknown): void {
     throw new Error('Missing required event handler properties');
   }
   settings = appSettings;
-  
-  // Get MIDI output if MIDI is enabled and an output is selected
-  let midiOutput: WebMidiOutput | null = null;
-  const instrumentSelect = document.getElementById("instrument") as HTMLSelectElement;
-  if (instrumentSelect && instrumentSelect.querySelector(':checked')?.parentElement instanceof HTMLOptGroupElement) {
-    const parentElement = instrumentSelect.querySelector(':checked')?.parentElement as HTMLOptGroupElement;
-    if (parentElement.label === 'MIDI out') {
-      const selectedOption = instrumentSelect.querySelector(':checked');
-      if (selectedOption?.textContent) {
-        midiOutput = window.WebMidi.getOutputByName(selectedOption.textContent);
-      }
-    }
-  }
 
   initActiveHex(appSettings);
   setupKeyboardEvents();
@@ -188,7 +174,7 @@ function onKeyDown(e: KeyboardEvent): void {
       && state.pressedKeys.indexOf(e.keyCode) === -1) {
     
     const hexCoords = settings.keyCodeToCoords[e.keyCode];
-    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
+    const note = hexCoords.x * settings.rSteps + hexCoords.y * settings.urSteps;
 
     if (settings.toggle_mode) {
       // In toggle mode, just toggle the note
@@ -308,7 +294,7 @@ const mouseDown = (e: MouseEvent) => {
   
   if (settings.toggle_mode) {
     // In toggle mode, just toggle the note
-    const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
+    const note = hexCoords.x * settings.rSteps + hexCoords.y * settings.urSteps;
     handleNote(hexCoords, !isNoteActive(note));
   } else {
     // In normal mode, activate the note
@@ -451,7 +437,7 @@ function handleTouch(e: TouchEvent): void {
     if (e.type === 'touchstart') {
       const screenCoords = getUnifiedPointerPosition(e.touches[0]);
       const hexCoords = getHexCoordsAt(screenCoords);
-      const note = getMidiFromCoords(hexCoords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
+      const note = hexCoords.x * settings.rSteps + hexCoords.y * settings.urSteps;
       handleNote(hexCoords, !isNoteActive(note));
     }
     return;
@@ -577,7 +563,7 @@ export function handleHexClick(event: MouseEvent | TouchEvent, hexCoords: { x: n
   if (!settings) return;
 
   const point = new Point(hexCoords.x, hexCoords.y);
-  const note = getMidiFromCoords(point, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
+  const note = point.x * settings.rSteps + point.y * settings.urSteps;
   
   if (settings.toggle_mode) {
     // In toggle mode, just toggle the note
