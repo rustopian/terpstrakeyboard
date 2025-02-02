@@ -204,8 +204,23 @@ export class SettingsManager {
     }
 
     public loadFromForm(): void {
-        // Load basic settings
-        this.settings.fundamental = parseFloat((document.getElementById("fundamental") as HTMLInputElement).value);
+        // Get the current pitch type and value
+        const pitchType = (document.getElementById('pitch-type') as HTMLSelectElement)?.value;
+        const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
+        
+        if (fundamentalInput) {
+            const inputValue = parseFloat(fundamentalInput.value);
+            if (!isNaN(inputValue)) {
+                // If pitch type is A4, convert to C4 before storing
+                if (pitchType === 'A4') {
+                    this.settings.fundamental = inputValue * Math.pow(2, -9/12);
+                } else {
+                    this.settings.fundamental = inputValue;
+                }
+            }
+        }
+
+        // Load other settings...
         this.settings.rSteps = parseInt((document.getElementById("rSteps") as HTMLInputElement).value);
         this.settings.urSteps = this.settings.rSteps - parseInt((document.getElementById("urSteps") as HTMLInputElement).value);
         this.settings.hexSize = parseInt((document.getElementById("hexSize") as HTMLInputElement).value);
@@ -403,18 +418,39 @@ export class SettingsManager {
 
         if (!fundamentalInput) return;
 
-        const currentValue = parseFloat(fundamentalInput.value);
+        const currentC4 = this.settings.fundamental;
         
         if (pitchType === 'A4') {
             // Convert from C4 to A4 (A4 is 9 semitones above C4)
-            fundamentalInput.value = (currentValue * Math.pow(2, 9/12)).toFixed(5);
+            const a4Value = currentC4 * Math.pow(2, 9/12);
+            fundamentalInput.value = a4Value.toFixed(5);
         } else {
-            // Convert from A4 to C4 (C4 is 9 semitones below A4)
-            fundamentalInput.value = (currentValue * Math.pow(2, -9/12)).toFixed(5);
+            // When switching back to C4, show the actual C4 value
+            fundamentalInput.value = currentC4.toFixed(5);
+        }
+    }
+
+    public handleFundamentalChange(): void {
+        const pitchType = (document.getElementById('pitch-type') as HTMLSelectElement)?.value;
+        const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
+
+        if (!fundamentalInput) return;
+
+        const inputValue = parseFloat(fundamentalInput.value);
+        
+        if (isNaN(inputValue)) return;
+
+        if (pitchType === 'A4') {
+            // Convert A4 to C4 (C4 is 9 semitones below A4)
+            // For example: if A4 = 442Hz, then C4 = 442 * 2^(-9/12) ≈ 263.0Hz
+            this.settings.fundamental = inputValue * Math.pow(2, -9/12);
+        } else {
+            // Input is C4, set it directly as fundamental
+            // For example: if C4 = 261.63Hz, then that's our fundamental
+            this.settings.fundamental = inputValue;
         }
 
-        // Update settings and redraw
-        this.settings.fundamental = parseFloat(fundamentalInput.value);
+        // Update display and redraw
         drawGrid();
     }
 

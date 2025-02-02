@@ -43,6 +43,7 @@ declare global {
     updateColorVisionMode: () => void;
     updateColorSaturation: () => void;
     updateKeyboardDisplay: () => void;
+    settingsManager: SettingsManager;
   }
 
   interface WebMidiOutput {
@@ -495,3 +496,6 @@ function goKeyboard(): boolean {
 
     return false;
 }
+
+// Initialize the settings manager
+window.settingsManager = new SettingsManager();

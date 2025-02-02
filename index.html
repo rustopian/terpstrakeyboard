@@ -50,11 +50,11 @@
 							<div class="pitch-input-group">
 								<label>Reference Pitch</label>
 								<div class="pitch-controls">
-									<select id="pitch-type" class="u-half-width">
+									<select id="pitch-type" class="u-half-width" onchange="window.settingsManager.handlePitchTypeChange();">
 										<option value="fundamental">C4 (Hz)</option>
 										<option value="A4">A4 (Hz)</option>
 									</select>
-									<input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="changeURL();noPreset();" class="u-half-width">
+									<input id="fundamental" type="number" step="any" min="0.015625" max="16384" onchange="window.settingsManager.handleFundamentalChange();changeURL();noPreset();" class="u-half-width">
 								</div>
 							</div>
 

@@ -61,6 +61,7 @@ export class NoteEventManager {
       } else {
         const buffer = sampleManager.getBuffer(event.frequency);
         if (buffer && !this.activeNotes.has(key)) {
+          console.log(`[DEBUG] Playing note: ${event.frequency.toFixed(3)} Hz (MIDI: ${event.midiNote})`);
           const { source, gainNode } = await this.createAudioNodes(buffer, event.frequency);
           const nodeId = audioNodeManager.add(gainNode, source, event.frequency);
           
@@ -106,9 +107,13 @@ export class NoteEventManager {
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     
-    // Calculate playback rate based on frequency
-    const baseFreq = this.getBaseFrequency(buffer.sampleRate);
-    source.playbackRate.value = frequency / baseFreq;
+    // Get the base frequency of the sample we're using
+    const sampleBaseFreq = frequency > 622 ? 880 :
+                          frequency > 311 ? 440 :
+                          frequency > 155 ? 220 : 110;
+    
+    // Calculate playback rate to achieve desired frequency from this sample
+    source.playbackRate.value = frequency / sampleBaseFreq;
     
     const gainNode = this.audioContext.createGain();
     gainNode.gain.value = 0.3; // Initial gain
@@ -118,11 +123,6 @@ export class NoteEventManager {
     
     source.start(0);
     return { source, gainNode };
-  }
-
-  private getBaseFrequency(sampleRate: number): number {
-    // Logic to determine base frequency based on sample rate
-    return sampleRate === 44100 ? 440 : 880;
   }
 
   private releaseAudioNode(gainNode: GainNode, source: AudioBufferSourceNode): void {

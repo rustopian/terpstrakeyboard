@@ -24,6 +24,7 @@ export class ActiveHex {
     this.coords = coords;
     const centsObj = hexCoordsToCents(coords);
     this.frequency = settings.fundamental * Math.pow(2, centsObj.cents / 1200);
+    console.log(`[DEBUG] Note frequency: ${this.frequency.toFixed(3)} Hz (coords: ${coords.x},${coords.y}, cents: ${centsObj.cents.toFixed(1)})`);
     this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
   }
 
@@ -140,8 +141,12 @@ function getMidiCoords(midiNote: number): Point | null {
 }
 
 function getFrequencyForNote(midiNote: number): number {
-  if (!settings) return 440;
-  return settings.fundamental * Math.pow(2, (midiNote - 69) / 12);
+  if (!settings) {
+    console.warn('Settings not initialized for frequency calculation');
+    return 0;
+  }
+  // Use the fundamental from settings and calculate relative to C4 (MIDI 60)
+  return settings.fundamental * Math.pow(2, (midiNote - 60) / 12);
 }
 
 // Initialize release all button handler
