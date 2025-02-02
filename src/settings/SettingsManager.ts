@@ -418,16 +418,24 @@ export class SettingsManager {
 
         if (!fundamentalInput) return;
 
-        const currentC4 = this.settings.fundamental;
+        // If fundamental is 0 or not set, use default C4 = 261.6255653 Hz
+        const currentC4 = this.settings.fundamental || 261.6255653;
         
         if (pitchType === 'A4') {
             // Convert from C4 to A4 (A4 is 9 semitones above C4)
             const a4Value = currentC4 * Math.pow(2, 9/12);
             fundamentalInput.value = a4Value.toFixed(5);
+            // Also update settings to store the C4 value
+            this.settings.fundamental = currentC4;
         } else {
             // When switching back to C4, show the actual C4 value
             fundamentalInput.value = currentC4.toFixed(5);
+            this.settings.fundamental = currentC4;
         }
+
+        // Update URL and redraw
+        this.changeURL();
+        drawGrid();
     }
 
     public handleFundamentalChange(): void {
@@ -811,14 +819,21 @@ export class SettingsManager {
         // Update note configuration
         this.updateNoteConfigFromPreset(parameters);
 
-        // Parse scale if it exists
-        if (parameters.scale) {
-            const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
-            if (scaleElement) {
-                scaleElement.value = typeof parameters.scale === 'string' ? 
-                    parameters.scale : parameters.scale.join('\n');
-                this.parseScale();
+        // Handle pitch type parameter
+        const pitchType = parameters['pitch-type'];
+        if (pitchType) {
+            const pitchTypeSelect = document.getElementById('pitch-type') as HTMLSelectElement;
+            if (pitchTypeSelect) {
+                pitchTypeSelect.value = pitchType;
+                // Update fundamental display if needed
+                this.handlePitchTypeChange();
             }
+        }
+
+        // Update scale and names
+        const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
+        if (scaleElement && parameters.scale) {
+            scaleElement.value = Array.isArray(parameters.scale) ? parameters.scale.join('\n') : parameters.scale;
         }
 
         // Trigger UI updates
@@ -868,7 +883,7 @@ export class SettingsManager {
     public updateNoteConfigFromPreset(parameters: any): void {
         // Update all form inputs based on parameters
         const formInputs = {
-            'fundamental': parameters.fundamental,
+            'fundamental': parameters.fundamental || '261.6255653', // Default C4 if not specified
             'rSteps': parameters.right,
             'urSteps': parameters.upright,
             'hexSize': parameters.size,
@@ -899,6 +914,28 @@ export class SettingsManager {
                 }
             }
         });
+
+        // Set pitch type dropdown based on fundamental frequency
+        const pitchTypeSelect = document.getElementById('pitch-type') as HTMLSelectElement;
+        if (pitchTypeSelect) {
+            // Get pitch type from parameters or default to fundamental
+            const pitchType = parameters['pitch-type'] || 'fundamental';
+            pitchTypeSelect.value = pitchType;
+            
+            // Update fundamental value based on pitch type
+            const fundamentalInput = document.getElementById('fundamental') as HTMLInputElement;
+            if (fundamentalInput && fundamentalInput.value) {
+                const inputValue = parseFloat(fundamentalInput.value);
+                if (!isNaN(inputValue)) {
+                    if (pitchType === 'A4') {
+                        // Convert A4 to C4 for internal storage
+                        this.settings.fundamental = inputValue * Math.pow(2, -9/12);
+                    } else {
+                        this.settings.fundamental = inputValue;
+                    }
+                }
+            }
+        }
 
         // Handle multiline text areas
         const textAreas = {
@@ -940,7 +977,7 @@ export class SettingsManager {
         if (quicklinks && quicklinks.selectedIndex > 0) {
             const selectedOption = quicklinks.options[quicklinks.selectedIndex];
             url.searchParams.set('preset', encodeURIComponent(selectedOption.text));
-            
+
             // Also add the preset's parameters to ensure they're preserved
             try {
                 const parameters = JSON.parse(selectedOption.value);
@@ -957,13 +994,13 @@ export class SettingsManager {
         }
 
         function getElementValue(id: string): string {
-            const element = document.getElementById(id) as HTMLInputElement;
+            const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
             return element ? (element.type === 'checkbox' ? element.checked.toString() : element.value) : '';
         }
 
         // Add modified parameters to URL
         const params = [
-            "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
+            "pitch-type", "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
             "instrument", "enum", "equivSteps", "spectrum_colors",
             "fundamental_color", "no_labels", "midi_input", "invert-updown",
             "show_intervals", "show_all_notes", "key-image", "symbolic-chord-notation",
@@ -1028,7 +1065,13 @@ export class SettingsManager {
         // Set up event listeners for form elements
         const pitchTypeSelect = document.getElementById('pitch-type') as HTMLSelectElement;
         if (pitchTypeSelect) {
-            pitchTypeSelect.addEventListener('change', () => this.handlePitchTypeChange());
+            // Set initial value to fundamental (C4) mode
+            pitchTypeSelect.value = 'fundamental';
+            // Add change event listener
+            pitchTypeSelect.addEventListener('change', () => {
+                this.handlePitchTypeChange();
+                this.changeURL();
+            });
         }
 
         const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
