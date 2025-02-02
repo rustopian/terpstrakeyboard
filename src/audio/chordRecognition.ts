@@ -3,7 +3,10 @@ import { SETTINGS_53_EDO, SETTINGS_31_EDO } from '../settings/tuningTypes';
 // Display currently played notes
 export function updateChordDisplay(notes: number[]): void {
   const display = document.getElementById('chord-display');
-  if (!display) return;
+  if (!display) {
+    console.log('[DEBUG] Display element not found');
+    return;
+  }
 
   if (notes.length === 0) {
     display.style.display = 'none';
@@ -26,7 +29,10 @@ export function updateChordDisplay(notes: number[]): void {
   if (notes.length > 1) {
     // Determine which tuning system to use based on the number of steps
     const tuningSystem = equivSteps === 31 ? SETTINGS_31_EDO : SETTINGS_53_EDO;
+    console.log(`[DEBUG] Using tuning system: ${equivSteps === 31 ? '31-EDO' : '53-EDO'}`);
+    
     const chordResult = recognizeChord(notes, tuningSystem, equivSteps);
+    console.log('[DEBUG] Chord recognition result:', chordResult);
     
     if (chordResult) {
       const inversionText = chordResult.inversion > 0 ? ` (${chordResult.inversion}${getOrdinalSuffix(chordResult.inversion)} inv)` : '';
@@ -36,7 +42,11 @@ export function updateChordDisplay(notes: number[]): void {
       
       // Use either full name or symbol based on settings
       const chordName = settings.useSymbolicChordNotation ? chordResult.symbol : chordResult.fullName;
-      display.textContent = `${chordName}${inversionText}${additionalText}`;
+      const finalText = `${chordName}${inversionText}${additionalText}`;
+      console.log('[DEBUG] Setting display text to:', finalText);
+      display.textContent = finalText;
+    } else {
+      console.log('[DEBUG] No chord result returned');
     }
   }
 }
@@ -101,11 +111,13 @@ function noteNameToSteps(noteName: string, tuningSystem: typeof SETTINGS_53_EDO 
 function getChordPattern(spelling: string[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): number[] {
   const steps = spelling.map(note => noteNameToSteps(note, tuningSystem));
   const root = steps[0];
-  return steps.slice(1).map(step => {
+  const pattern = steps.slice(1).map(step => {
     let interval = step - root;
-    if (interval < 0) interval += (tuningSystem === SETTINGS_31_EDO ? 31 : 53);
+    while (interval < 0) interval += (tuningSystem === SETTINGS_31_EDO ? 31 : 53);
+    interval = interval % (tuningSystem === SETTINGS_31_EDO ? 31 : 53);
     return interval;
   });
+  return pattern;
 }
 
 function getIntervalName(interval: number, tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): string | null {
@@ -132,125 +144,92 @@ function recognizeChord(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | 
   return result;
 }
 
+// Add this new function to convert step numbers back to note names
+function getNoteName(step: number, tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO): string {
+  const settings = (window as any).settings;
+  if (!settings || !settings.names) return '';
+  
+  // Get the note name from settings.names array
+  const normalizedStep = ((step % settings.scale.length) + settings.scale.length) % settings.scale.length;
+  return settings.names[normalizedStep] || '';
+}
+
 function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO, totalSteps: number): ChordResult | null {
   if (notes.length < 2) return null;
 
   const bassNote = notes[0];
   
-  // For chord pattern matching, we still need to work with reduced notes
+  // For chord pattern matching, normalize all notes to within one octave
   const uniqueNotes = [...new Set(notes.map(n => ((n % totalSteps) + totalSteps) % totalSteps))];
   const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
   
-  let bestResult: ChordResult | null = null;
-  let bestScore = -Infinity;
-
-  // Group chord spellings by number of notes
-  const spellingsBySize = new Map<number, Array<[string, any]>>();
-  for (const [quality, spelling] of Object.entries(tuningSystem.CHORD_SPELLINGS)) {
-    const pattern = Array.isArray(spelling) ? spelling : spelling.spelling;
-    const size = pattern.length;
-    if (!spellingsBySize.has(size)) {
-      spellingsBySize.set(size, []);
-    }
-    spellingsBySize.get(size)!.push([quality, spelling]);
+  if (notes.length === 3) {
+    console.log(`[DEBUG] Triad detected - Notes: ${notes.join(', ')} (normalized: ${sortedNotes.join(', ')})`);
   }
 
-  // Sort sizes in descending order, but not larger than number of unique notes
-  const sortedSizes = Array.from(spellingsBySize.keys())
-    .filter(size => size <= uniqueNotes.length)
-    .sort((a, b) => b - a);
+  let bestResult: ChordResult | null = null;
+  let bestScore = -Infinity;
 
   // Try each note as potential root
   for (let i = 0; i < sortedNotes.length; i++) {
     const potentialRoot = sortedNotes[i];
     
-    // Calculate intervals from this potential root
-    const intervals = [];
-    for (let j = 0; j < sortedNotes.length; j++) {
-      if (j !== i) {
-        let interval = ((sortedNotes[j] - potentialRoot + totalSteps) % totalSteps);
-        intervals.push(interval);
-      }
+    // Calculate intervals from this root to all other notes
+    const intervals = sortedNotes
+      .filter((_, idx) => idx !== i)
+      .map(note => {
+        let interval = note - potentialRoot;
+        // Normalize to positive interval within one octave
+        while (interval < 0) interval += totalSteps;
+        interval = interval % totalSteps;
+        return interval;
+      })
+      .sort((a, b) => a - b);
+
+    if (notes.length === 3) {
+      console.log(`[DEBUG] Testing root ${potentialRoot} - Raw intervals: ${intervals.join(', ')}`);
     }
 
-    // Try each chord size in descending order
-    for (const size of sortedSizes) {
-      const spellingsOfSize = spellingsBySize.get(size) || [];
-      
-      // Try each chord quality of this size
-      for (const [quality, spelling] of spellingsOfSize) {
-        const pattern = Array.isArray(spelling) ? 
-          getChordPattern(spelling, tuningSystem) : 
-          getChordPattern(spelling.spelling, tuningSystem);
+    // Try each chord spelling from the tuning system
+    for (const [chordName, spelling] of Object.entries(tuningSystem.CHORD_SPELLINGS)) {
+      const pattern = Array.isArray(spelling) ? 
+        getChordPattern(spelling, tuningSystem) : 
+        getChordPattern(spelling.spelling, tuningSystem);
+
+      // Sort the pattern for comparison
+      const sortedPattern = [...pattern].sort((a, b) => a - b);
+
+      // Check if our intervals match this chord pattern
+      if (intervals.length === sortedPattern.length && 
+          intervals.every((interval, idx) => interval === sortedPattern[idx])) {
         
-        const sortedPattern = [...pattern].sort((a, b) => a - b);
-        const sortedIntervals = [...intervals].sort((a, b) => a - b);
-        
-        const triadMatch = sortedPattern.every(patternInterval => 
-          sortedIntervals.includes(patternInterval));
+        const rootNoteName = getNoteName(potentialRoot, tuningSystem);
+        const symbol = Array.isArray(spelling) ? 
+          `${rootNoteName} ${chordName}` : 
+          rootNoteName + spelling.symbol.replace(/^C/, '');
 
-        if (triadMatch) {
-          // Calculate chord tones
-          const chordTones = [potentialRoot];
-          for (const interval of pattern) {
-            let tone = (potentialRoot + interval) % totalSteps;
-            chordTones.push(tone);
-          }
+        // Calculate inversion
+        const inversion = potentialRoot === bassNote ? 0 : 
+                        bassNote === sortedNotes[(i + 1) % sortedNotes.length] ? 1 : 
+                        bassNote === sortedNotes[(i + 2) % sortedNotes.length] ? 2 : 3;
 
-          // Find the actual root note in the original notes array
-          const rootNote = notes.find(n => n % totalSteps === potentialRoot);
-          if (!rootNote) continue; // Skip if root isn't in original notes
+        const result = {
+          root: rootNoteName,
+          quality: chordName,
+          fullName: `${rootNoteName} ${chordName}`,
+          inversion,
+          additionalIntervals: [],
+          symbol
+        };
 
-          // Determine inversion
-          let inversion = 0;
-          const bassPosition = chordTones.indexOf(bassNote % totalSteps);
-          if (bassPosition > 0) {
-            inversion = bassPosition;
-          }
+        // Score based on number of notes matched and inversion
+        let score = pattern.length * 20;
+        score -= inversion * 5;  // Prefer root position slightly
 
-          // Find additional intervals
-          const chordIntervals = new Set(sortedPattern);
-          const additionalIntervals = sortedIntervals
-            .filter(interval => !chordIntervals.has(interval))
-            .map(interval => getIntervalName(interval, tuningSystem))
-            .filter((name): name is string => name !== null);
-
-          const result = {
-            root: rootNote.toString(),
-            quality: Array.isArray(spelling) ? quality : spelling.symbol.replace(/^C/, ''),
-            fullName: Array.isArray(spelling) ? quality : quality.replace(/^C/, ''),
-            inversion,
-            additionalIntervals: additionalIntervals,
-            symbol: Array.isArray(spelling) ? rootNote.toString() + quality : rootNote.toString() + spelling.symbol.replace(/^C/, '')
-          };
-
-          // Score based on actual MIDI note distances and chord completeness
-          let score = 0;
-          
-          // Bonus for larger chords
-          score += size * 20;
-          
-          // Bonus for exact matches (no additional intervals)
-          if (additionalIntervals.length === 0) {
-            score += 50;
-          }
-          
-          // Prefer roots that are closer to the bass note in actual MIDI distance
-          score -= Math.abs(rootNote - notes[0]);
-          
-          // Penalty for additional intervals
-          score -= additionalIntervals.length * 10;
-
-          if (score > bestScore) {
-            bestResult = result;
-            bestScore = score;
-          }
+        if (score > bestScore) {
+          bestScore = score;
+          bestResult = result;
         }
-      }
-      
-      // If we found a match at this size with no additional intervals, we can stop
-      if (bestResult && bestResult.additionalIntervals?.length === 0) {
-        break;
       }
     }
   }
