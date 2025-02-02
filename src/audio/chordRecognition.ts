@@ -163,32 +163,39 @@ function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO 
   const uniqueNotes = [...new Set(notes.map(n => ((n % totalSteps) + totalSteps) % totalSteps))];
   const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
   
-  if (notes.length === 3) {
-    console.log(`[DEBUG] Triad detected - Notes: ${notes.join(', ')} (normalized: ${sortedNotes.join(', ')})`);
-  }
-
   let bestResult: ChordResult | null = null;
   let bestScore = -Infinity;
+
+  // Helper function to check if a subset of notes contains all pattern intervals from a root
+  function hasAllIntervals(root: number, noteSubset: number[], pattern: number[]): boolean {
+    const intervals = noteSubset
+      .filter(note => note !== root)
+      .map(note => {
+        let interval = note - root;
+        while (interval < 0) interval += totalSteps;
+        return interval % totalSteps;
+      })
+      .sort((a, b) => a - b);
+
+    const sortedPattern = [...pattern].sort((a, b) => a - b);
+    return sortedPattern.every(patternInterval => 
+      intervals.some(interval => interval === patternInterval)
+    );
+  }
 
   // Try each note as potential root
   for (let i = 0; i < sortedNotes.length; i++) {
     const potentialRoot = sortedNotes[i];
     
-    // Calculate intervals from this root to all other notes
+    // Calculate all intervals from this root
     const intervals = sortedNotes
       .filter((_, idx) => idx !== i)
       .map(note => {
         let interval = note - potentialRoot;
-        // Normalize to positive interval within one octave
         while (interval < 0) interval += totalSteps;
-        interval = interval % totalSteps;
-        return interval;
+        return interval % totalSteps;
       })
       .sort((a, b) => a - b);
-
-    if (notes.length === 3) {
-      console.log(`[DEBUG] Testing root ${potentialRoot} - Raw intervals: ${intervals.join(', ')}`);
-    }
 
     // Try each chord spelling from the tuning system
     for (const [chordName, spelling] of Object.entries(tuningSystem.CHORD_SPELLINGS)) {
@@ -196,35 +203,59 @@ function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO 
         getChordPattern(spelling, tuningSystem) : 
         getChordPattern(spelling.spelling, tuningSystem);
 
-      // Sort the pattern for comparison
-      const sortedPattern = [...pattern].sort((a, b) => a - b);
+      // Find all notes that could be part of this chord
+      const chordNotes = [potentialRoot];
+      const remainingNotes = new Set(sortedNotes);
+      remainingNotes.delete(potentialRoot);
 
-      // Check if our intervals match this chord pattern
-      if (intervals.length === sortedPattern.length && 
-          intervals.every((interval, idx) => interval === sortedPattern[idx])) {
-        
+      // For each interval in the pattern, find a matching note
+      for (const patternInterval of pattern.sort((a, b) => a - b)) {
+        for (const note of remainingNotes) {
+          let interval = note - potentialRoot;
+          while (interval < 0) interval += totalSteps;
+          interval = interval % totalSteps;
+          
+          if (interval === patternInterval) {
+            chordNotes.push(note);
+            remainingNotes.delete(note);
+            break;
+          }
+        }
+      }
+
+      // If we found all the notes for this chord pattern
+      if (chordNotes.length === pattern.length + 1) {
         const rootNoteName = getNoteName(potentialRoot);
         const symbol = Array.isArray(spelling) ? 
           `${rootNoteName} ${chordName}` : 
           rootNoteName + spelling.symbol.replace(/^C/, '');
 
-        // Calculate inversion
+        // Calculate inversion based on bass note
         const inversion = potentialRoot === bassNote ? 0 : 
-                        bassNote === sortedNotes[(i + 1) % sortedNotes.length] ? 1 : 
-                        bassNote === sortedNotes[(i + 2) % sortedNotes.length] ? 2 : 3;
+                        chordNotes.indexOf(bassNote) > 0 ? chordNotes.indexOf(bassNote) : 0;
+
+        // Get interval names for remaining notes
+        const additionalIntervals = Array.from(remainingNotes).map(note => {
+          let interval = note - potentialRoot;
+          while (interval < 0) interval += totalSteps;
+          interval = interval % totalSteps;
+          const intervalName = getIntervalName(interval, tuningSystem);
+          return intervalName || `${interval} steps`;
+        });
 
         const result = {
           root: rootNoteName,
           quality: chordName,
           fullName: `${rootNoteName} ${chordName}`,
           inversion,
-          additionalIntervals: [],
+          additionalIntervals,
           symbol
         };
 
-        // Score based on number of notes matched and inversion
-        let score = pattern.length * 20;
-        score -= inversion * 5;  // Prefer root position slightly
+        // Score based on chord size and inversion
+        let score = pattern.length * 20;  // Prefer larger chords
+        score -= inversion * 5;  // Slightly prefer root position
+        score += chordNotes.includes(bassNote) ? 10 : 0;  // Prefer when bass note is part of chord
 
         if (score > bestScore) {
           bestScore = score;
@@ -244,4 +275,43 @@ function getOrdinalSuffix(n: number): string {
   if (j === 2 && k !== 12) return 'nd';
   if (j === 3 && k !== 13) return 'rd';
   return 'th';
+}
+
+function normalizeInterval(interval: number, totalSteps: number): number {
+  while (interval < 0) interval += totalSteps;
+  return interval % totalSteps;
+}
+
+function getIntervalsBetweenNotes(notes: number[], root: number, totalSteps: number): number[] {
+  return notes
+    .filter(note => note !== root)
+    .map(note => normalizeInterval(note - root, totalSteps))
+    .sort((a, b) => a - b);
+}
+
+function findBestChordSubset(notes: number[], root: number, pattern: number[], totalSteps: number): number[] {
+  const result: number[] = [root];
+  const remainingNotes = new Set(notes.filter(n => n !== root));
+  
+  for (const patternInterval of pattern) {
+    let bestNote: number | null = null;
+    let bestDistance = Infinity;
+    
+    for (const note of remainingNotes) {
+      const interval = normalizeInterval(note - root, totalSteps);
+      const distance = Math.abs(interval - patternInterval);
+      
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestNote = note;
+      }
+    }
+    
+    if (bestNote !== null && bestDistance === 0) {
+      result.push(bestNote);
+      remainingNotes.delete(bestNote);
+    }
+  }
+  
+  return result;
 } 

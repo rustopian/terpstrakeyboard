@@ -14,7 +14,7 @@ export function initActiveHex(appSettings: AudioSettings): void {
 export class ActiveHex {
   coords: Point;
   frequency: number;
-  note: number;  // Raw note number from grid coordinates
+  note: number;  // Full note number including octave
   midiNote: number;  // Only used for MIDI output
   nodeId?: string;
 
@@ -37,8 +37,8 @@ export class ActiveHex {
       reducedSteps += equivSteps;
     }
     
-    // Store the reduced note number for chord display
-    this.note = reducedSteps;
+    // Store the full note number including octave
+    this.note = distance;
     
     // Calculate MIDI note only for MIDI output
     this.midiNote = getMidiFromCoords(coords, settings.rSteps, settings.urSteps, settings.octaveOffset, settings.scale.length);
@@ -88,15 +88,21 @@ const toggledNotes = new Set<number>();
 
 export function addActiveNote(hex: ActiveHex): void {
   if (!settings) return;
-  activeNotes.add(hex.note);  // Use raw note number
-  console.log(`[DEBUG] Active notes after add: [${Array.from(activeNotes).join(', ')}]`);
+  if (settings.toggle_mode) {
+    toggledNotes.add(hex.note);  // In toggle mode, add to toggledNotes
+  } else {
+    activeNotes.add(hex.note);  // In normal mode, add to activeNotes
+  }
+  console.log(`[DEBUG] Active notes after add: [${Array.from(activeNotes).join(', ')}], toggled: [${Array.from(toggledNotes).join(', ')}]`);
   updateChordDisplay(getActiveNotes());
 }
 
 export function removeActiveNote(hex: ActiveHex): void {
   if (!settings) return;
-  activeNotes.delete(hex.note);  // Use raw note number
-  console.log(`[DEBUG] Active notes after remove: [${Array.from(activeNotes).join(', ')}]`);
+  // Remove from both sets - the note could be in either one
+  activeNotes.delete(hex.note);
+  toggledNotes.delete(hex.note);
+  console.log(`[DEBUG] Active notes after remove: [${Array.from(activeNotes).join(', ')}], toggled: [${Array.from(toggledNotes).join(', ')}]`);
   updateChordDisplay(getActiveNotes());
 }
 
@@ -105,24 +111,35 @@ export function releaseAllNotes(): void {
   
   console.log(`[DEBUG] Releasing all notes: [${Array.from(activeNotes).join(', ')}, toggled: ${Array.from(toggledNotes).join(', ')}]`);
   
+  // Helper function to find coordinates for a note
+  const findCoordsForNote = (note: number): Point | null => {
+    for (let x = -10; x <= 10; x++) {
+      for (let y = -10; y <= 10; y++) {
+        const distance = x * settings!.rSteps + y * settings!.urSteps;
+        if (distance === note) {
+          return new Point(x, y);
+        }
+      }
+    }
+    return null;
+  };
+  
   // Release all active notes
   for (const note of activeNotes) {
-    const coords = new Point(
-      Math.floor(note / settings.rSteps),
-      note % settings.rSteps
-    );
-    const hex = new ActiveHex(coords);
-    hex.noteOff();
+    const coords = findCoordsForNote(note);
+    if (coords) {
+      const hex = new ActiveHex(coords);
+      hex.noteOff();
+    }
   }
   
   // Release all toggled notes
   for (const note of toggledNotes) {
-    const coords = new Point(
-      Math.floor(note / settings.rSteps),
-      note % settings.rSteps
-    );
-    const hex = new ActiveHex(coords);
-    hex.noteOff();
+    const coords = findCoordsForNote(note);
+    if (coords) {
+      const hex = new ActiveHex(coords);
+      hex.noteOff();
+    }
   }
 
   // Clear tracking sets
@@ -150,30 +167,42 @@ export function activateNote(note: number): void {
   if (!settings) return;
   console.log(`[DEBUG] Activating note: ${note}`);
   
-  // Convert note number back to coordinates for audio handling
-  const coords = new Point(
-    Math.floor(note / settings.rSteps),
-    note % settings.rSteps
-  );
+  // Then solve for coordinates that would give us this note
+  // distance = x * rSteps + y * urSteps should equal note exactly
+  let foundCoords = null;
+  for (let x = -10; x <= 10 && !foundCoords; x++) {
+    for (let y = -10; y <= 10 && !foundCoords; y++) {
+      const distance = x * settings.rSteps + y * settings.urSteps;
+      if (distance === note) {
+        foundCoords = new Point(x, y);
+        console.log(`[DEBUG] Found coords (${x},${y}) for note ${note}, distance=${distance}`);
+      }
+    }
+  }
+  
+  if (!foundCoords) {
+    console.error(`[ERROR] Could not find coordinates for note ${note}`);
+    return;
+  }
   
   if (settings.toggle_mode) {
     if (toggledNotes.has(note)) {
       // If note is already toggled on, turn it off
       toggledNotes.delete(note);
       // Create an ActiveHex instance to handle the note off
-      const hex = new ActiveHex(coords);
+      const hex = new ActiveHex(foundCoords);
       hex.noteOff();
     } else {
       // Toggle note on
       toggledNotes.add(note);
       // Create an ActiveHex instance to handle the note on
-      const hex = new ActiveHex(coords);
+      const hex = new ActiveHex(foundCoords);
       hex.noteOn();
     }
   } else {
     activeNotes.add(note);
     // Create an ActiveHex instance to handle the note on
-    const hex = new ActiveHex(coords);
+    const hex = new ActiveHex(foundCoords);
     hex.noteOn();
   }
   updateChordDisplay(getActiveNotes());
