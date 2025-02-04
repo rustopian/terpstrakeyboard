@@ -111,7 +111,12 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
   }
 
   if (!settings.no_labels) {
-    const name = settings.enum ? "" + reducedNote : settings.names[reducedNote];
+    // When using numbers, apply the numberRoot offset
+    let displayNote = reducedNote;
+    if (settings.enum && typeof settings.numberRoot === 'number') {
+      displayNote = ((reducedNote - (settings.numberRoot || 0) + equivSteps) % equivSteps);
+    }
+    const name = settings.enum ? "" + displayNote : settings.names[reducedNote];
     if (name) {
       settings.context.save();
       let scaleFactor = name.length > 3 ? 3 / name.length : 1;

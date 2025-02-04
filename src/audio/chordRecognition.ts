@@ -140,7 +140,6 @@ function getNoteName(step: number): string {
 function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO, totalSteps: number): ChordResult | null {
   if (notes.length < 2) return null;
 
-  const bassNote = notes[0];
   const uniqueNotes = [...new Set(notes.map(n => ((n % totalSteps) + totalSteps) % totalSteps))];
   const sortedNotes = [...uniqueNotes].sort((a, b) => a - b);
   
@@ -240,50 +239,7 @@ function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO 
   return bestResult;
 }
 
-function getOrdinalSuffix(n: number): string {
-  const j = n % 10;
-  const k = n % 100;
-  if (j === 1 && k !== 11) return 'st';
-  if (j === 2 && k !== 12) return 'nd';
-  if (j === 3 && k !== 13) return 'rd';
-  return 'th';
-}
-
 function normalizeInterval(interval: number, totalSteps: number): number {
   while (interval < 0) interval += totalSteps;
   return interval % totalSteps;
 }
-
-function getIntervalsBetweenNotes(notes: number[], root: number, totalSteps: number): number[] {
-  return notes
-    .filter(note => note !== root)
-    .map(note => normalizeInterval(note - root, totalSteps))
-    .sort((a, b) => a - b);
-}
-
-function findBestChordSubset(notes: number[], root: number, pattern: number[], totalSteps: number): number[] {
-  const result: number[] = [root];
-  const remainingNotes = new Set(notes.filter(n => n !== root));
-  
-  for (const patternInterval of pattern) {
-    let bestNote: number | null = null;
-    let bestDistance = Infinity;
-    
-    for (const note of remainingNotes) {
-      const interval = normalizeInterval(note - root, totalSteps);
-      const distance = Math.abs(interval - patternInterval);
-      
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestNote = note;
-      }
-    }
-    
-    if (bestNote !== null && bestDistance === 0) {
-      result.push(bestNote);
-      remainingNotes.delete(bestNote);
-    }
-  }
-  
-  return result;
-} 

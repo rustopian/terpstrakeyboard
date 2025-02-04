@@ -185,6 +185,7 @@ export interface DisplayRequired {
   maxR: number;
   minUR: number;
   maxUR: number;
+  numberRoot: number;
 }
 
 /**

@@ -164,8 +164,13 @@
 								<div class="control-group">
 									<label>
 										<input id="enum" type="checkbox" name="number_or_name" value="fnord" onchange="hideRevealNames();noPreset();">
-										<span class="label-body">Use Numbers</span>
+										<span class="label-body">Use Numbers with Root Note:</span>
 									</label>
+								</div>
+								<div class="control-group" id="number-root-container">
+									<select id="number-root" class="u-full-width" onchange="window.settingsManager.updateKeyboardDisplay();changeURL();noPreset();">
+										<!-- Note names will be populated dynamically -->
+									</select>
 								</div>
 
 								<div class="control-group">

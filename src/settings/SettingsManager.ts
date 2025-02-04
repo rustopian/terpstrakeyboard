@@ -247,6 +247,15 @@ export class SettingsManager {
         // Load colors and names
         this.settings.fundamental_color = (document.getElementById('fundamental_color') as HTMLInputElement).value;
         this.settings.names = (document.getElementById('names') as HTMLTextAreaElement).value.split('\n');
+
+        // Load number-root setting
+        const numberRootInput = document.getElementById('number-root') as HTMLInputElement;
+        if (numberRootInput) {
+            const numberRootValue = parseInt(numberRootInput.value);
+            if (!isNaN(numberRootValue)) {
+                this.settings.numberRoot = numberRootValue;
+            }
+        }
     }
 
     public parseScale(): void {
@@ -398,6 +407,14 @@ export class SettingsManager {
         this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
         
+        // Get number root value if enum is enabled
+        if (this.settings.enum) {
+            const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
+            if (numberRootSelect) {
+                this.settings.numberRoot = parseInt(numberRootSelect.value) || 0;
+            }
+        }
+        
         // Safely check for symbolic chord notation checkbox
         const fullNotationCheckbox = document.getElementById('full-chord-notation') as HTMLInputElement;
         this.settings.useFullChordNotation = fullNotationCheckbox ? fullNotationCheckbox.checked : false;
@@ -527,6 +544,34 @@ export class SettingsManager {
         });
     }
 
+    private populateNumberRootDropdown(): void {
+        const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
+        const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
+        
+        if (!numberRootSelect || !namesTextarea) return;
+
+        // Store current value before clearing
+        const currentValue = this.settings.numberRoot;
+
+        // Clear existing options
+        numberRootSelect.innerHTML = '';
+        
+        // Get note names and populate dropdown
+        const names = namesTextarea.value.split('\n');
+        names.forEach((name, index) => {
+            const option = document.createElement('option');
+            option.value = index.toString();
+            option.text = name;
+            numberRootSelect.appendChild(option);
+        });
+
+        // Set value from settings
+        if (currentValue !== undefined) {
+            numberRootSelect.value = currentValue.toString();
+            this.settings.numberRoot = currentValue;
+        }
+    }
+
     public initNoteConfig(): void {
         const noteConfig = document.getElementById('note-config');
         if (!noteConfig) return;
@@ -578,6 +623,7 @@ export class SettingsManager {
             namesTextarea.addEventListener('input', () => {
                 this.synchronizeTextareas();
                 this.updatePreviewButtons();
+                this.populateNumberRootDropdown();
                 this.updateKeyboardDisplay();
             });
 
@@ -587,6 +633,9 @@ export class SettingsManager {
                 this.updateKeyboardDisplay();
             });
         }
+
+        // Populate the number root dropdown initially
+        this.populateNumberRootDropdown();
     }
 
     private synchronizeTextareas(): void {
@@ -614,17 +663,37 @@ export class SettingsManager {
         const namesElement = document.getElementById("names") as HTMLElement;
         const numberLabel = document.getElementById("numberLabel") as HTMLElement;
         const namesLabel = document.getElementById("namesLabel") as HTMLElement;
+        const numberRootContainer = document.getElementById("number-root-container") as HTMLElement;
 
         if (enumCheckbox && enumCheckbox.checked) {
             if (equivStepsElement) equivStepsElement.style.display = 'block';
             if (namesElement) namesElement.style.display = 'none';
             if (numberLabel) numberLabel.style.display = 'block';
             if (namesLabel) namesLabel.style.display = 'none';
+            if (numberRootContainer) numberRootContainer.style.display = 'block';
+            
+            // Always populate the dropdown when enum is checked
+            const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
+            if (numberRootSelect) {
+                // Clear existing options
+                numberRootSelect.innerHTML = '';
+                // Populate with note names
+                const names = (document.getElementById('names') as HTMLTextAreaElement)?.value.split('\n') || [];
+                names.forEach((name, index) => {
+                    const option = document.createElement('option');
+                    option.value = index.toString();
+                    option.text = name;
+                    numberRootSelect.appendChild(option);
+                });
+                // Set current value
+                numberRootSelect.value = this.settings.numberRoot.toString();
+            }
         } else {
             if (equivStepsElement) equivStepsElement.style.display = 'none';
             if (namesElement) namesElement.style.display = 'block';
             if (numberLabel) numberLabel.style.display = 'none';
             if (namesLabel) namesLabel.style.display = 'block';
+            if (numberRootContainer) numberRootContainer.style.display = 'none';
         }
         this.updateKeyboardDisplay();
     }
@@ -703,6 +772,8 @@ export class SettingsManager {
         if (window.location.search) {
             const params = new URLSearchParams(window.location.search);
             const paramObj: any = {};
+            
+            // First pass: decode all parameters
             params.forEach((value, key) => {
                 try {
                     paramObj[key] = decodeURIComponent(value);
@@ -710,9 +781,20 @@ export class SettingsManager {
                     paramObj[key] = value;
                 }
             });
-            
+
+            // Special handling for number-root before anything else
+            if ('number-root' in paramObj) {
+                const rootValue = parseInt(paramObj['number-root']);
+                if (!isNaN(rootValue)) {
+                    this.settings.numberRoot = rootValue;
+                }
+            }
+
             // Update form with URL parameters
             this.updateFromPreset(paramObj);
+
+            // Ensure the dropdown is populated with current note names
+            this.populateNumberRootDropdown();
             
             // Try to find and select matching preset in dropdown based on scale content
             const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
@@ -802,6 +884,14 @@ export class SettingsManager {
             settingsDialog.style.display = 'none';
         }
 
+        // Handle number root value early
+        if (parameters['number-root'] !== undefined) {
+            const rootValue = parseInt(parameters['number-root']);
+            if (!isNaN(rootValue)) {
+                this.settings.numberRoot = rootValue;
+            }
+        }
+
         // Update form fields with preset values
         Object.entries(parameters).forEach(([key, value]) => {
             const element = document.getElementById(key) as HTMLInputElement;
@@ -836,8 +926,49 @@ export class SettingsManager {
             scaleElement.value = Array.isArray(parameters.scale) ? parameters.scale.join('\n') : parameters.scale;
         }
 
+        // Handle number root and dropdown visibility
+        const enumCheckbox = document.getElementById('enum') as HTMLInputElement;
+        const numberRootContainer = document.getElementById('number-root-container') as HTMLElement;
+        const equivStepsElement = document.getElementById('equivSteps') as HTMLElement;
+        const namesElement = document.getElementById('names') as HTMLElement;
+        const numberLabel = document.getElementById('numberLabel') as HTMLElement;
+        const namesLabel = document.getElementById('namesLabel') as HTMLElement;
+
+        if (enumCheckbox?.checked) {
+            // Show number-related elements
+            if (equivStepsElement) equivStepsElement.style.display = 'block';
+            if (numberLabel) numberLabel.style.display = 'block';
+            if (namesElement) namesElement.style.display = 'none';
+            if (namesLabel) namesLabel.style.display = 'none';
+            if (numberRootContainer) numberRootContainer.style.display = 'block';
+            
+            // Always populate the dropdown when enum is checked
+            const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
+            if (numberRootSelect) {
+                // Clear existing options
+                numberRootSelect.innerHTML = '';
+                // Populate with note names
+                const names = (document.getElementById('names') as HTMLTextAreaElement)?.value.split('\n') || [];
+                names.forEach((name, index) => {
+                    const option = document.createElement('option');
+                    option.value = index.toString();
+                    option.text = name;
+                    numberRootSelect.appendChild(option);
+                });
+
+                // Set number root value from settings
+                numberRootSelect.value = this.settings.numberRoot.toString();
+            }
+        } else {
+            // Hide number-related elements
+            if (equivStepsElement) equivStepsElement.style.display = 'none';
+            if (numberLabel) numberLabel.style.display = 'none';
+            if (namesElement) namesElement.style.display = 'block';
+            if (namesLabel) namesLabel.style.display = 'block';
+            if (numberRootContainer) numberRootContainer.style.display = 'none';
+        }
+
         // Trigger UI updates
-        this.hideRevealNames();
         this.hideRevealColors();
         this.hideRevealEnum();
 
@@ -864,7 +995,7 @@ export class SettingsManager {
 
         // Find the Lumatone preset
         for (let i = 0; i < mselect.options.length; i++) {
-            if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
+            if (mselect.options[i].text === "31-ed2 Lumatone") {
                 mselect.selectedIndex = i;
                 try {
                     const parameters = JSON.parse(mselect.value);
@@ -977,25 +1108,13 @@ export class SettingsManager {
         if (quicklinks && quicklinks.selectedIndex > 0) {
             const selectedOption = quicklinks.options[quicklinks.selectedIndex];
             url.searchParams.set('preset', encodeURIComponent(selectedOption.text));
-
-            // Also add the preset's parameters to ensure they're preserved
-            try {
-                const parameters = JSON.parse(selectedOption.value);
-                Object.entries(parameters).forEach(([key, value]) => {
-                    if (Array.isArray(value)) {
-                        url.searchParams.set(key, encodeURIComponent(value.join('\n')));
-                    } else {
-                        url.searchParams.set(key, encodeURIComponent(String(value)));
-                    }
-                });
-            } catch (e) {
-                console.warn('Error parsing preset parameters:', e);
-            }
         }
 
         function getElementValue(id: string): string {
             const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
-            return element ? (element.type === 'checkbox' ? element.checked.toString() : element.value) : '';
+            if (!element) return '';
+            if (element.type === 'checkbox') return element.checked.toString();
+            return element.value;
         }
 
         // Add modified parameters to URL
@@ -1013,6 +1132,13 @@ export class SettingsManager {
                 url.searchParams.set(param, encodeURIComponent(value));
             }
         });
+
+        // Always include number-root in URL if enum is checked
+        const enumCheckbox = document.getElementById('enum') as HTMLInputElement;
+        if (enumCheckbox?.checked) {
+            console.log('[DEBUG] Updating URL with number-root:', this.settings.numberRoot);
+            url.searchParams.set('number-root', this.settings.numberRoot.toString());
+        }
 
         // Add scale, names, and note_colors
         ["scale", "names", "note_colors"].forEach(param => {
@@ -1038,6 +1164,7 @@ export class SettingsManager {
             document.title = description;
         }
 
+        console.log('[DEBUG] Final URL:', url.toString());
         window.history.replaceState({}, '', url.toString());
     }
 
@@ -1062,6 +1189,9 @@ export class SettingsManager {
             this.loadDefaultPreset();
         }
 
+        // Initialize note configuration (which now includes populating the dropdown)
+        this.initNoteConfig();
+
         // Set up event listeners for form elements
         const pitchTypeSelect = document.getElementById('pitch-type') as HTMLSelectElement;
         if (pitchTypeSelect) {
@@ -1072,6 +1202,22 @@ export class SettingsManager {
                 this.handlePitchTypeChange();
                 this.changeURL();
             });
+        }
+
+        // Add event listener for number-root dropdown
+        const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
+        if (numberRootSelect) {
+            console.log('[DEBUG] Attaching event listener to number-root dropdown');
+            numberRootSelect.addEventListener('change', () => {
+                const selectedValue = numberRootSelect.value;
+                console.log('[DEBUG] Dropdown selected value:', selectedValue);
+                this.settings.numberRoot = parseInt(selectedValue);
+                console.log('[DEBUG] Number root changed to:', this.settings.numberRoot);
+                this.updateKeyboardDisplay();
+                this.changeURL();
+            });
+        } else {
+            console.error('[DEBUG] number-root element not found');
         }
 
         const octaveSlider = document.getElementById('central-octave') as HTMLInputElement;
@@ -1111,9 +1257,6 @@ export class SettingsManager {
                 });
             }
         });
-
-        // Initialize note configuration
-        this.initNoteConfig();
 
         // Load presets
         this.loadPresets();

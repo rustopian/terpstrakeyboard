@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (mselect) {
             // Find and select the Lumatone preset
             for (let i = 0; i < mselect.options.length; i++) {
-                if (mselect.options[i].text === "53-ed2 Bosanquet / Wilson / Terpstra (Lumatone)") {
+                if (mselect.options[i].text === "31-ed2 Lumatone") {
                     mselect.selectedIndex = i;
                     // Apply the preset
                     try {
@@ -222,9 +222,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settingsForm) {
         settingsForm.onsubmit = async (event: Event) => {
             event.preventDefault();
+            console.log('[DEBUG] Form submitted, current number-root:', window.settingsManager.settings.numberRoot);
             await goKeyboard();
+            console.log('[DEBUG] After goKeyboard, number-root:', window.settingsManager.settings.numberRoot);
             return false;
         };
+    }
+
+    // Add event listener for number-root dropdown
+    const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
+    if (numberRootSelect) {
+        console.log('[DEBUG] Attaching event listener to number-root dropdown');
+        numberRootSelect.addEventListener('change', () => {
+            const selectedValue = numberRootSelect.value;
+            console.log('[DEBUG] Dropdown selected value:', selectedValue);
+            window.settingsManager.settings.numberRoot = parseInt(selectedValue);
+            console.log('[DEBUG] Number root changed to:', window.settingsManager.settings.numberRoot);
+            window.settingsManager.updateKeyboardDisplay();
+            window.settingsManager.changeURL();
+        });
+    } else {
+        console.error('[DEBUG] number-root element not found');
     }
 
     console.log("[DEBUG] All setup complete, calling goKeyboard...");
@@ -300,7 +318,7 @@ function back(): void {
 async function goKeyboard(): Promise<boolean> {
     // Update URL before anything else
     settingsManager.changeURL();
-    console.log("[DEBUG] Starting keyboard initialization...");
+    console.log('[DEBUG] Starting keyboard initialization...');
 
     // Hide settings and show keyboard
     hideSettings();
@@ -318,6 +336,7 @@ async function goKeyboard(): Promise<boolean> {
 
     // Load settings from form
     settingsManager.loadFromForm();
+    console.log('[DEBUG] After loadFromForm, number-root:', settingsManager.settings.numberRoot);
     settings = settingsManager.getSettings();
 
     // Parse scale and colors
@@ -335,15 +354,15 @@ async function goKeyboard(): Promise<boolean> {
     resizeHandler();
 
     // Initialize event handlers
-    console.log("Initializing event handlers with settings:", settings);
+    console.log('Initializing event handlers with settings:', settings);
     initEventHandlers(settings);
 
     // Show keyboard and settings button
-    const keyboard = document.getElementById("keyboard");
+    const keyboard = document.getElementById('keyboard');
     if (keyboard) {
-        keyboard.style.display = "block";
-        keyboard.style.visibility = "visible";
-        keyboard.style.opacity = "1";
+        keyboard.style.display = 'block';
+        keyboard.style.visibility = 'visible';
+        keyboard.style.opacity = '1';
     }
 
     const settingsButton = document.getElementById('settings-button');
@@ -362,9 +381,9 @@ async function goKeyboard(): Promise<boolean> {
     // Load new instrument samples
     try {
         await loadInstrumentSamples();
-        console.log("[DEBUG] New instrument samples loaded successfully");
+        console.log('[DEBUG] New instrument samples loaded successfully');
     } catch (error) {
-        console.error("[DEBUG] Error loading new instrument samples:", error);
+        console.error('[DEBUG] Error loading new instrument samples:', error);
     }
 
     // Force a redraw

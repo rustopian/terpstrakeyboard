@@ -22,6 +22,7 @@ export interface Settings {
   names: string[];
   enum: boolean;
   equivSteps: number;
+  numberRoot: number;
   no_labels: boolean;
   spectrum_colors: boolean;
   fundamental_color: string;
@@ -76,6 +77,7 @@ export const defaultSettings: Settings = {
   names: [],
   enum: false,
   equivSteps: 0,
+  numberRoot: 0,
   no_labels: false,
   spectrum_colors: false,
   fundamental_color: '#55ff55',
