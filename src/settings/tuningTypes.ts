@@ -7,6 +7,7 @@ interface IntervalData {
   sizeCents?: number;
   justCents?: number;
   limit?: number;
+  intervalSymbol?: string;
 }
 
 export interface TuningSystem {
@@ -84,198 +85,166 @@ export const SETTINGS_31_EDO: TuningSystem = {
     '♭': -2  // Unicode flat
   },
   INTERVAL_DICT: {
-    0: [
-      {
+    0: [{
         intervalName: 'Perfect Unison',
+        intervalSymbol: 'P1',
         sizeCents: 0
-      }
-    ],
-    1: [
-      {
+      }],
+    1: [{
         intervalName: 'Super Unison',
+        intervalSymbol: 'S1',
         sizeCents: 38.71
-      }
-    ],
-    2: [
-      {
+      }],
+    2: [{
         intervalName: 'Augmented Unison',
+        intervalSymbol: 'A1',
         sizeCents: 77.42
-      }
-    ],
-    3: [
-      {
+      }],
+    3: [{
         intervalName: 'Minor Second',
+        intervalSymbol: 'm2',
         sizeCents: 116.13
-      }
-    ],
-    4: [
-      {
+      }],
+    4: [{
         intervalName: 'Neutral Second',
+        intervalSymbol: 'n2',
         sizeCents: 154.84
-      }
-    ],
-    5: [
-      {
+      }],
+    5: [{
         intervalName: 'Major Second',
+        intervalSymbol: 'M2',
         sizeCents: 193.55
-      }
-    ],
-    6: [
-      {
+      }],
+    6: [{
         intervalName: 'Supermajor Second',
+        intervalSymbol: 'S2',
         sizeCents: 232.26
-      }
-    ],
-    7: [
-      {
+      }],
+    7: [{
         intervalName: 'Subminor Third',
+        intervalSymbol: 's3',
         sizeCents: 270.97
-      }
-    ],
-    8: [
-      {
+      }],
+    8: [{
         intervalName: 'Minor Third',
+        intervalSymbol: 'm3',
         sizeCents: 309.68
-      }
-    ],
-    9: [
-      {
+      }],
+    9: [{
         intervalName: 'Neutral Third',
+        intervalSymbol: 'n3',
         sizeCents: 348.39
-      }
-    ],
-    10: [
-      {
+      }],
+    10: [{
         intervalName: 'Major Third',
+        intervalSymbol: 'M3',
         sizeCents: 387.1
-      }
-    ],
-    11: [
-      {
+      }],
+    11: [{
         intervalName: 'Supermajor Third',
+        intervalSymbol: 'S3',
         sizeCents: 425.81
-      }
-    ],
-    12: [
-      {
+      }],
+    12: [{
         intervalName: 'Sub Fourth',
+        intervalSymbol: 's4',
         sizeCents: 464.52
-      }
-    ],
-    13: [
-      {
+      }],
+    13: [{
         intervalName: 'Perfect Fourth',
+        intervalSymbol: 'P4',
         sizeCents: 503.23
-      }
-    ],
-    14: [
-      {
+      }],
+    14: [{
         intervalName: 'Super Fourth',
+        intervalSymbol: 'S4',
         sizeCents: 541.94
-      }
-    ],
-    15: [
-      {
+      }],
+    15: [{
         intervalName: 'Augmented Fourth',
+        intervalSymbol: 'A4',
         sizeCents: 580.65
-      }
-    ],
-    16: [
-      {
+      }],
+    16: [{
         intervalName: 'Diminished Fifth',
+        intervalSymbol: 'd5',
         sizeCents: 619.35
-      }
-    ],
-    17: [
-      {
+      }],
+    17: [{
         intervalName: 'Sub Fifth',
+        intervalSymbol: 's5',
         sizeCents: 658.06
-      }
-    ],
-    18: [
-      {
+      }],
+    18: [{
         intervalName: 'Perfect Fifth',
+        intervalSymbol: 'P5',
         sizeCents: 696.77
-      }
-    ],
-    19: [
-      {
+      }],
+    19: [{
         intervalName: 'Super Fifth',
+        intervalSymbol: 'S5',
         sizeCents: 735.48
-      }
-    ],
-    20: [
-      {
+      }],
+    20: [{
         intervalName: 'Subminor Sixth',
+        intervalSymbol: 's6',
         sizeCents: 774.19
-      }
-    ],
-    21: [
-      {
+      }],
+    21: [{
         intervalName: 'Minor Sixth',
+        intervalSymbol: 'm6',
         sizeCents: 812.9
-      }
-    ],
-    22: [
-      {
+      }],
+    22: [{
         intervalName: 'Neutral Sixth',
+        intervalSymbol: 'n6',
         sizeCents: 851.61
-      }
-    ],
-    23: [
-      {
+      }],
+    23: [{
         intervalName: 'Major Sixth',
+        intervalSymbol: 'M6',
         sizeCents: 890.32
-      }
-    ],
-    24: [
-      {
+      }],
+    24: [{
         intervalName: 'Supermajor Sixth',
+        intervalSymbol: 'S6',
         sizeCents: 929.03
-      }
-    ],
-    25: [
-      {
+      }],
+    25: [{
         intervalName: 'Subminor Seventh',
+        intervalSymbol: 's7',
         sizeCents: 967.74
-      }
-    ],
-    26: [
-      {
+      }],
+    26: [{
         intervalName: 'Minor Seventh',
+        intervalSymbol: 'm7',
         sizeCents: 1006.45
-      }
-    ],
-    27: [
-      {
+      }],
+    27: [{
         intervalName: 'Neutral Seventh',
+        intervalSymbol: 'n7',
         sizeCents: 1045.16
-      }
-    ],
-    28: [
-      {
+      }],
+    28: [{
         intervalName: 'Major Seventh',
+        intervalSymbol: 'M7',
         sizeCents: 1083.87
-      }
-    ],
-    29: [
-      {
+      }],
+    29: [{
         intervalName: 'Supermajor Seventh',
+        intervalSymbol: 'S7',
         sizeCents: 1122.58
-      }
-    ],
-    30: [
-      {
+      }],
+    30: [{
         intervalName: 'Sub Octave',
+        intervalSymbol: 's8',
         sizeCents: 1161.29
-      }
-    ],
-    31: [
-      {
+      }],
+    31: [{
         intervalName: 'Perfect Octave',
+        intervalSymbol: 'P8',
         sizeCents: 1200
-      }
-    ]
+      }]
   },
   CHORD_SPELLINGS: {
       // Standard Triads

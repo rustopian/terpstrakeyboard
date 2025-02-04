@@ -234,7 +234,7 @@ export class SettingsManager {
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement)?.checked ?? false;
         this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement)?.checked ?? false;
         this.settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement)?.checked ?? false;
-        this.settings.useSymbolicChordNotation = (document.getElementById('symbolic-chord-notation') as HTMLInputElement)?.checked ?? false;
+        this.settings.useFullChordNotation = (document.getElementById('full-chord-notation') as HTMLInputElement)?.checked ?? false;
         this.settings.toggle_mode = (document.getElementById('toggle_mode') as HTMLInputElement)?.checked ?? false;
         
         // Load key image settings
@@ -399,8 +399,8 @@ export class SettingsManager {
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
         
         // Safely check for symbolic chord notation checkbox
-        const symbolicNotationCheckbox = document.getElementById('symbolic-chord-notation') as HTMLInputElement;
-        this.settings.useSymbolicChordNotation = symbolicNotationCheckbox ? symbolicNotationCheckbox.checked : false;
+        const fullNotationCheckbox = document.getElementById('full-chord-notation') as HTMLInputElement;
+        this.settings.useFullChordNotation = fullNotationCheckbox ? fullNotationCheckbox.checked : false;
             
         // Parse scale and colors
         this.parseScaleColors();
@@ -841,9 +841,9 @@ export class SettingsManager {
         this.hideRevealColors();
         this.hideRevealEnum();
 
-        if (parameters.symbolic_chord_notation !== undefined) {
-            (document.getElementById('symbolic-chord-notation') as HTMLInputElement).checked = 
-                parameters.symbolic_chord_notation === 'true';
+        if (parameters.full_chord_notation !== undefined) {
+            (document.getElementById('full-chord-notation') as HTMLInputElement).checked = 
+                parameters.full_chord_notation === 'true';
         }
 
         // Update dimensions and rotation matrix
@@ -1003,7 +1003,7 @@ export class SettingsManager {
             "pitch-type", "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
             "instrument", "enum", "equivSteps", "spectrum_colors",
             "fundamental_color", "no_labels", "midi_input", "invert-updown",
-            "show_intervals", "show_all_notes", "key-image", "symbolic-chord-notation",
+            "show_intervals", "show_all_notes", "key-image", "full-chord-notation",
             "toggle_mode"
         ];
 
@@ -1091,7 +1091,7 @@ export class SettingsManager {
 
         // Set up checkbox event listeners
         const checkboxes = ['no_labels', 'spectrum_colors', 'enum', 'show_all_notes', 
-                          'show_intervals', 'invert-updown', 'symbolic-chord-notation', 'toggle_mode'];
+                          'show_intervals', 'invert-updown', 'full-chord-notation', 'toggle_mode'];
         checkboxes.forEach(id => {
             const checkbox = document.getElementById(id) as HTMLInputElement;
             if (checkbox) {

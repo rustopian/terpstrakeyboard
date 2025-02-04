@@ -51,7 +51,7 @@ export interface Settings {
   useKeyImage: boolean;
   keyImage: string;
   textSize: number;
-  useSymbolicChordNotation?: boolean;
+  useFullChordNotation?: boolean;
   midi_input: boolean;
   toggle_mode: boolean;
 }
@@ -105,7 +105,7 @@ export const defaultSettings: Settings = {
   useKeyImage: false,
   keyImage: '',
   textSize: 1.0,
-  useSymbolicChordNotation: false,
+  useFullChordNotation: false,
   midi_input: false,
   toggle_mode: false
 }; 

@@ -220,9 +220,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add form submission handler
     const settingsForm = document.getElementById('settingsForm') as HTMLFormElement;
     if (settingsForm) {
-        settingsForm.onsubmit = (event: Event) => {
+        settingsForm.onsubmit = async (event: Event) => {
             event.preventDefault();
-            goKeyboard();
+            await goKeyboard();
             return false;
         };
     }
@@ -297,7 +297,7 @@ function back(): void {
 }
 
 // Update goKeyboard to not try to start audio immediately
-function goKeyboard(): boolean {
+async function goKeyboard(): Promise<boolean> {
     // Update URL before anything else
     settingsManager.changeURL();
     console.log("[DEBUG] Starting keyboard initialization...");
@@ -349,6 +349,22 @@ function goKeyboard(): boolean {
     const settingsButton = document.getElementById('settings-button');
     if (settingsButton) {
         settingsButton.style.display = 'block';
+    }
+
+    // Ensure audio context is initialized and resumed
+    if (!settings.audioContext) {
+        settings.audioContext = await initAudio();
+    }
+    if (settings.audioContext && settings.audioContext.state === 'suspended') {
+        await settings.audioContext.resume();
+    }
+
+    // Load new instrument samples
+    try {
+        await loadInstrumentSamples();
+        console.log("[DEBUG] New instrument samples loaded successfully");
+    } catch (error) {
+        console.error("[DEBUG] Error loading new instrument samples:", error);
     }
 
     // Force a redraw
