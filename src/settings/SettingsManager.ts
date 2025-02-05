@@ -1148,6 +1148,12 @@ export class SettingsManager {
             }
         });
 
+        // Add learningChord to URL if it exists
+        if (this.settings.learningChordSymbol) {
+            const learningChordSymbol = encodeURIComponent(this.settings.learningChordSymbol);
+            url.searchParams.set('learningChord', learningChordSymbol);
+        }
+
         // Update page title from scale description
         const scaleElement = document.getElementById('scale') as HTMLTextAreaElement;
         if (scaleElement) {

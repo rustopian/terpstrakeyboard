@@ -17,6 +17,7 @@ export class ActiveHex {
   note: number;  // Full note number including octave
   midiNote: number;  // Only used for MIDI output
   nodeId?: string;
+  opacity: number = 1.0; // Default full opacity
 
   constructor(coords: Point) {
     if (!settings) {
@@ -79,6 +80,17 @@ export class ActiveHex {
 
     console.log(`[DEBUG] Note OFF: coords(${this.coords.x},${this.coords.y}), raw note=${this.note}`);
     removeActiveNote(this);
+  }
+
+  draw(context: CanvasRenderingContext2D): void {
+    // Implement drawing logic with opacity
+    context.globalAlpha = this.opacity;
+    // Example drawing logic (replace with actual hex drawing code)
+    context.beginPath();
+    context.arc(this.coords.x, this.coords.y, 10, 0, 2 * Math.PI); // Example circle
+    context.fillStyle = 'blue'; // Example color
+    context.fill();
+    context.globalAlpha = 1.0; // Reset opacity
   }
 }
 

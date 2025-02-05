@@ -22,6 +22,7 @@ import { ScrollManager } from './ui/ScrollManager';
 
 // Import settings manager
 import { SettingsManager } from './settings/SettingsManager';
+import { SETTINGS_31_EDO } from './settings/tuningTypes';
 
 // Add WebMidi types
 declare global {
@@ -222,9 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settingsForm) {
         settingsForm.onsubmit = async (event: Event) => {
             event.preventDefault();
-            console.log('[DEBUG] Form submitted, current number-root:', window.settingsManager.settings.numberRoot);
             await goKeyboard();
-            console.log('[DEBUG] After goKeyboard, number-root:', window.settingsManager.settings.numberRoot);
             return false;
         };
     }
@@ -232,17 +231,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add event listener for number-root dropdown
     const numberRootSelect = document.getElementById('number-root') as HTMLSelectElement;
     if (numberRootSelect) {
-        console.log('[DEBUG] Attaching event listener to number-root dropdown');
         numberRootSelect.addEventListener('change', () => {
-            const selectedValue = numberRootSelect.value;
-            console.log('[DEBUG] Dropdown selected value:', selectedValue);
-            window.settingsManager.settings.numberRoot = parseInt(selectedValue);
-            console.log('[DEBUG] Number root changed to:', window.settingsManager.settings.numberRoot);
             window.settingsManager.updateKeyboardDisplay();
             window.settingsManager.changeURL();
         });
     } else {
         console.error('[DEBUG] number-root element not found');
+    }
+
+    // Add event listener for learning note root dropdown
+    const learningNoteRootSelect = document.getElementById('learning-note-root') as HTMLSelectElement;
+    if (learningNoteRootSelect) {
+        learningNoteRootSelect.addEventListener('change', () => {
+            const selectedIndex = learningNoteRootSelect.selectedIndex;
+            const selectedRootNote = settings.names[selectedIndex];
+            console.log('[DEBUG] Selected root note:', selectedRootNote);
+
+            // Update all chord names with the new root note
+            updateChordNames(selectedRootNote);
+
+            // Save the selected root note to the URL
+            const url = new URL(window.location.href);
+            url.searchParams.set('rootNote', encodeURIComponent(selectedRootNote));
+            window.history.replaceState({}, '', url.toString());
+            console.log('[DEBUG] Updated URL with rootNote:', url.toString());
+        });
+    } else {
+        console.error('[DEBUG] learning-note-root element not found');
     }
 
     console.log("[DEBUG] All setup complete, calling goKeyboard...");
@@ -336,7 +351,6 @@ async function goKeyboard(): Promise<boolean> {
 
     // Load settings from form
     settingsManager.loadFromForm();
-    console.log('[DEBUG] After loadFromForm, number-root:', settingsManager.settings.numberRoot);
     settings = settingsManager.getSettings();
 
     // Parse scale and colors
@@ -389,8 +403,174 @@ async function goKeyboard(): Promise<boolean> {
     // Force a redraw
     drawGrid();
 
+    initLearningFunctions();
+
     return false;
 }
 
 // Initialize the settings manager
 window.settingsManager = new SettingsManager();
+
+// Ensure settings are loaded before populating the dropdown
+settings = settingsManager.getSettings();
+
+// Function to replace 'b' with '♭' and '#' with '♯' in note names
+function replaceAccidentals(noteName: string): string {
+    return noteName.replace(/b/g, '♭').replace(/#/g, '♯');
+}
+
+// Apply replaceAccidentals to note names when loading or updating
+settings.names = settings.names.map(replaceAccidentals);
+
+// Update the chord names with the new root note
+function updateChordNames(rootNote: string) {
+    const chordList = document.getElementById('chord-list');
+    if (!chordList) return;
+
+    // Update each chord name with the new root note
+    Array.from(chordList.children).forEach((li) => {
+        const chordName = li.textContent || '';
+        // Clear existing accidentals and special characters, then apply the new root note
+        const newChordName = replaceAccidentals(chordName.replace(/^[^A-G]*[A-G][b#♯♭]?/, rootNote));
+        li.textContent = newChordName;
+
+        // Update the chordData object with the new root note
+        const chordData = SETTINGS_31_EDO.CHORD_SPELLINGS[chordName] as { symbol: string; spelling: string[] };
+        if (chordData && 'symbol' in chordData) {
+            chordData.symbol = newChordName;
+        }
+    });
+}
+
+// Call replaceAccidentals when loading note names
+function populateLearningNoteDropdown() {
+    const learningNoteRootSelect = document.getElementById('learning-note-root') as HTMLSelectElement;
+    const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
+    
+    if (!learningNoteRootSelect || !namesTextarea) return;
+
+    // Clear existing options
+    learningNoteRootSelect.innerHTML = '';
+    
+    // Get note names from the current tuning system
+    const noteNames = settings.names.map(replaceAccidentals);
+    console.log('[DEBUG] Note names:', noteNames);
+    noteNames.forEach((name, index) => {
+        const option = document.createElement('option');
+        option.value = index.toString();
+        option.text = name;
+        learningNoteRootSelect.appendChild(option);
+    });
+}
+
+// Function to populate the chord list
+function populateChordList() {
+    const chordList = document.getElementById('chord-list');
+    if (!chordList) return;
+
+    // Clear existing list
+    chordList.innerHTML = '';
+
+    // Get chords from tuningTypes
+    const chords = SETTINGS_31_EDO.CHORD_SPELLINGS; // Example using 31-EDO, adjust as needed
+    Object.entries(chords).forEach(([chordName, chordData]) => {
+        const listItem = document.createElement('li');
+        listItem.textContent = chordData.symbol;
+        listItem.className = 'toggle-button';
+        listItem.onclick = () => {
+            console.log('[DEBUG] Chord button clicked:', chordName);
+            setLearningMode(chordData);
+        };
+        chordList.appendChild(listItem);
+    });
+
+    // Style chord list as columns
+    chordList.style.display = 'grid';
+    chordList.style.gridTemplateColumns = 'repeat(auto-fill, minmax(100px, 1fr))';
+    chordList.style.gap = '10px';
+}
+
+// Add CSS for toggle-style buttons
+const style = document.createElement('style');
+style.textContent = `
+    .toggle-button {
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        padding: 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+    .toggle-button.selected {
+        background-color: #007bff;
+        color: white;
+    }
+    .toggle-button:hover {
+        background-color: #e0e0e0;
+    }
+`;
+document.head.appendChild(style);
+
+// Function to set learning mode
+function setLearningMode(chordData: { symbol: string; spelling: string[] }) {
+    console.log('[DEBUG] setLearningMode called with chordData:', chordData);
+    // Update settings with the selected chord
+    settings.learningChord = chordData.spelling;
+    settings.learningChordSymbol = chordData.symbol;
+    console.log('[DEBUG] Updated settings.learningChordSymbol:', settings.learningChordSymbol);
+    
+    // Update URL with learningChord symbol
+    const url = new URL(window.location.href);
+    url.searchParams.set('learningChord', encodeURIComponent(chordData.symbol));
+    window.history.replaceState({}, '', url.toString());
+    console.log('[DEBUG] Updated URL with learningChord:', url.toString());
+
+    // Update UI to reflect selected chord
+    const chordList = document.getElementById('chord-list');
+    if (chordList) {
+        chordList.querySelectorAll('li').forEach(li => {
+            li.classList.remove('selected');
+        });
+        const selectedChord = Array.from(chordList.children).find(li => li.textContent === chordData.symbol);
+        if (selectedChord) {
+            selectedChord.classList.add('selected');
+        }
+    }
+
+    updateKeyboardDisplay();
+}
+
+// Update keyboard display to highlight learning mode
+function updateKeyboardDisplay() {
+    // Clear the canvas
+    if (settings.canvas && settings.context) {
+        settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
+    }
+
+    // Draw the grid
+    drawGrid();
+
+    // Highlight learning mode
+    if (settings.learningChord) {
+        const hexes = settings.activeHexObjects;
+        hexes.forEach(hex => {
+            const noteNumber = hex.note;
+            // Check if the note is part of the learning chord
+            if (settings.learningChord.includes(noteNumber.toString())) {
+                // Set full opacity for chord notes
+                hex.opacity = 1.0;
+            } else {
+                // Set opacity to 20% for non-chord notes
+                hex.opacity = 0.2;
+            }
+            // Redraw hex with updated opacity
+            hex.draw(settings.context);
+        });
+    }
+}
+
+// Initialize learning functions
+function initLearningFunctions() {
+    populateLearningNoteDropdown();
+    populateChordList();
+}
