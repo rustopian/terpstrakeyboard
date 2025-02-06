@@ -88,7 +88,11 @@ export function playNote(freq: number): { source: AudioBufferSourceNode; gainNod
   const gainNode = settings.audioContext.createGain();
   source.connect(gainNode);
   gainNode.connect(settings.audioContext.destination);
-  gainNode.gain.value = 0.3;
+  
+  // Start with zero gain and ramp up for click-free start
+  const currentTime = settings.audioContext.currentTime;
+  gainNode.gain.setValueAtTime(0, currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.3, currentTime + 0.01);
   
   source.start(0);
   
@@ -102,7 +106,12 @@ export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNod
   if (!settings?.audioContext || settings.sustain) return;
   
   if (gainNode?.gain) {
-    gainNode.gain.setTargetAtTime(0, settings.audioContext.currentTime, settings.fadeoutTime);
+    const currentTime = settings.audioContext.currentTime;
+    const currentGain = gainNode.gain.value;
+    
+    // Preserve current gain value and use exponential ramp for natural decay
+    gainNode.gain.setValueAtTime(currentGain, currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, currentTime + settings.fadeoutTime);
   }
   if (source) {
     const releaseTime = settings.audioContext.currentTime + settings.fadeoutTime;

@@ -140,16 +140,21 @@ export class SettingsManager {
     private updateAllActiveNoteVolumes(): void {
         if (!this.settings.audioContext) return;
 
+        const baseGain = 0.3; // Match the initial gain from audioHandler
+        const currentTime = this.settings.audioContext.currentTime;
+        const rampTime = 0.1; // Increased for smoother changes
+
         // Update volume for all active notes
         for (const hex of this.settings.activeHexObjects) {
             if (hex.nodeId && this.settings.activeSources[hex.nodeId as any]) {
                 const gainNode = this.settings.activeSources[hex.nodeId as any].gainNode;
-                const currentTime = this.settings.audioContext.currentTime;
-                // Use a short ramp time for smooth transitions
-                const rampTime = 0.05; // 50ms ramp
-                gainNode.gain.cancelScheduledValues(currentTime);
-                gainNode.gain.linearRampToValueAtTime(
-                    this.settings.tiltVolume,
+                const targetGain = baseGain * this.settings.tiltVolume;
+
+                // Instead of canceling, schedule from the current value
+                const currentGain = gainNode.gain.value;
+                gainNode.gain.setValueAtTime(currentGain, currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(
+                    Math.max(0.0001, targetGain), // Prevent zero value for exponential ramp
                     currentTime + rampTime
                 );
             }
