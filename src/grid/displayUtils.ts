@@ -14,6 +14,7 @@ export function initDisplayUtils(displaySettings: unknown): void {
   if (!hasDisplayProps(displaySettings)) {
     throw new Error('Missing required display properties');
   }
+  console.log('[DEBUG] Initializing display utils with notation system:', displaySettings.notationSystem);
   settings = displaySettings;
 }
 
@@ -100,6 +101,8 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
   settings.context.fillStyle = current_text_color;
   const baseSize = 22 * (settings.textSize || 1); // textSize ranges from 0.2 to 1.0
   settings.context.font = `${baseSize}pt "Ekmelos", "Bravura Text", "Noto Music", Arial`;
+  settings.context.textRendering = 'optimizeLegibility';
+  settings.context.font = `${baseSize}pt "Ekmelos", "Bravura Text", "Noto Music", Arial`;
   settings.context.textAlign = "center";
   settings.context.textBaseline = "middle";
 
@@ -118,7 +121,9 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
       displayNote = ((reducedNote - (settings.numberRoot || 0) + equivSteps) % equivSteps);
     }
     let name = settings.enum ? "" + displayNote : settings.names[reducedNote];
+    console.log('[DEBUG] Before conversion - name:', name, 'notationSystem:', settings.notationSystem);
     name = convertNoteNameToSystem(name, settings.notationSystem);
+    console.log('[DEBUG] After conversion - name:', name);
     
     if (!settings.enum && name) {
       settings.context.save();
@@ -126,8 +131,18 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
       scaleFactor *= settings.hexSize / 50;
       settings.context.scale(scaleFactor, scaleFactor);
       
-      settings.context.textAlign = "center";
-      settings.context.fillText(name, 0, 0);
+      // Add manual letter spacing
+      const letterSpacing = baseSize * 0.15; // 15% of font size for spacing
+      const totalWidth = name.split('').reduce((width, char) => 
+        width + (settings.context.measureText(char).width + letterSpacing), -letterSpacing);
+      
+      let xPos = -totalWidth / 2;
+      for (const char of name) {
+        const charWidth = settings.context.measureText(char).width;
+        settings.context.fillText(char, xPos + charWidth/2, 0);
+        xPos += charWidth + letterSpacing;
+      }
+      
       settings.context.restore();
     }
 

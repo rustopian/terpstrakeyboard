@@ -1226,8 +1226,14 @@ export class SettingsManager {
         const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
         if (!notationSelect) return;
 
-        // Just update the notation system setting without converting note names
+        console.log('[DEBUG] Updating notation system from:', this.settings.notationSystem, 'to:', notationSelect.value);
+        
+        // Update both the settings object and the global settings
         this.settings.notationSystem = notationSelect.value;
+        window.settings.notationSystem = notationSelect.value;
+        
+        console.log('[DEBUG] Updated settings.notationSystem:', this.settings.notationSystem);
+        console.log('[DEBUG] Updated window.settings.notationSystem:', window.settings.notationSystem);
 
         // Update the keyboard display
         this.updateKeyboardDisplay();

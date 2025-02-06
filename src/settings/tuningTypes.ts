@@ -967,7 +967,20 @@ export type AccidentalSystem = {
 
 // Define available accidental systems
 export const ACCIDENTAL_SYSTEMS: AccidentalSystem[] = [
-    {
+      {
+        name: "Manually Entered Symbols",
+        symbols: {
+          [AccidentalStep.UP1]: "↑",
+          [AccidentalStep.DOWN1]: "↓",
+          [AccidentalStep.UP2]: "#",
+          [AccidentalStep.DOWN2]: "b",
+          [AccidentalStep.UP3]: "^#",
+          [AccidentalStep.DOWN3]: "v#",
+          [AccidentalStep.UP4]: "##",
+          [AccidentalStep.DOWN4]: "bb"
+        }
+      },
+      {
       name: "Manually Entered Symbols",
       symbols: {
         [AccidentalStep.UP1]: "^",
