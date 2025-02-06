@@ -312,6 +312,14 @@ select#quicklinks {
   display: none;  /* Initially hidden */
 }
 
+.chord-display .musical-note {
+  font-family: "Ekmelos", "Bravura Text", "Noto Music", Arial, sans-serif;
+  letter-spacing: 0.225em;  /* 50% increase from previous 0.15em */
+  font-size: 130%;  /* 30% larger than parent */
+  display: inline-block;  /* Ensures proper spacing */
+  vertical-align: middle;  /* Align with surrounding text */
+}
+
 .scroll-area {
   position: fixed;
   top: 0;

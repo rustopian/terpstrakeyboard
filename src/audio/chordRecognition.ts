@@ -1,4 +1,5 @@
 import { SETTINGS_53_EDO, SETTINGS_31_EDO } from '../settings/tuningTypes';
+import { convertNoteNameToSystem } from '../utils/accidentalUtils';
 
 // Display currently played notes
 export function updateChordDisplay(notes: number[]): void {
@@ -13,7 +14,25 @@ export function updateChordDisplay(notes: number[]): void {
   const tuningSystem = equivSteps === 31 ? SETTINGS_31_EDO : SETTINGS_53_EDO;
   
   const chordResult = recognizeChord(notes, tuningSystem, equivSteps);
-  display.textContent = formatChordResult(chordResult, notes, settings);
+  display.innerHTML = formatChordResult(chordResult, notes, settings);
+}
+
+// Add helper function to split note name
+function wrapNoteName(noteName: string): string {
+  // Find the base note letter (first occurrence of A-G)
+  const baseNoteMatch = noteName.match(/[A-G]/);
+  if (!baseNoteMatch) return noteName;
+  
+  const baseNoteIndex = baseNoteMatch.index!;
+  const prefix = noteName.slice(0, baseNoteIndex); // e.g., '↓↓'
+  const baseNote = noteName[baseNoteIndex]; // e.g., 'G'
+  const suffix = noteName.slice(baseNoteIndex + 1); // e.g., '♭'
+  
+  // Only wrap accidentals in the musical-note class
+  const wrappedPrefix = prefix ? `<span class="musical-note">${prefix}</span>` : '';
+  const wrappedSuffix = suffix ? `<span class="musical-note">${suffix}</span>` : '';
+  
+  return `${wrappedPrefix}${baseNote}${wrappedSuffix}`;
 }
 
 function formatChordResult(result: ChordResult | null, notes: number[], settings: any): string {
@@ -23,8 +42,9 @@ function formatChordResult(result: ChordResult | null, notes: number[], settings
   const bassName = getNoteName(bassNote);
   const rootName = result.root;
 
-  // Handle slash notation
-  const inversionSlash = bassName !== rootName ? `/${bassName}` : '';
+  // Handle slash notation with musical note class
+  const inversionSlash = bassName !== rootName ? 
+    `/${wrapNoteName(bassName)}` : '';
   
   // Format additional intervals
   const additions = result.additionalIntervals?.length 
@@ -32,9 +52,12 @@ function formatChordResult(result: ChordResult | null, notes: number[], settings
     : '';
 
   // Choose between symbolic or full name display
-  const chordName = settings.useFullChordNotation 
+  let chordName = settings.useFullChordNotation 
     ? result.fullName 
     : result.symbol;
+
+  // Replace the root note in the chord name with a wrapped version
+  chordName = chordName.replace(rootName, wrapNoteName(rootName));
 
   return `${chordName}${inversionSlash}${additions}`;
 }
@@ -134,7 +157,10 @@ function getNoteName(step: number): string {
   
   // Get the note name from settings.names array
   const normalizedStep = ((step % settings.scale.length) + settings.scale.length) % settings.scale.length;
-  return settings.names[normalizedStep] || '';
+  const noteName = settings.names[normalizedStep] || '';
+  
+  // Convert to the selected notation system
+  return convertNoteNameToSystem(noteName, settings.notationSystem);
 }
 
 function findChordInNotes(notes: number[], tuningSystem: typeof SETTINGS_53_EDO | typeof SETTINGS_31_EDO, totalSteps: number): ChordResult | null {
