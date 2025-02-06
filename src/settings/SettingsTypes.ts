@@ -187,6 +187,8 @@ export interface DisplayRequired {
   maxUR: number;
   numberRoot: number;
   notationSystem: string;
+  learningChord: string;
+  learningChordSymbol: string;
 }
 
 /**

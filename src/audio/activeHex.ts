@@ -78,7 +78,7 @@ export class ActiveHex {
       nodeId: this.nodeId
     });
 
-    console.log(`[DEBUG] Note OFF: coords(${this.coords.x},${this.coords.y}), raw note=${this.note}`);
+    // console.log(`[DEBUG] Note OFF: coords(${this.coords.x},${this.coords.y}), raw note=${this.note}`);
     removeActiveNote(this);
   }
 
@@ -105,7 +105,7 @@ export function addActiveNote(hex: ActiveHex): void {
   } else {
     activeNotes.add(hex.note);  // In normal mode, add to activeNotes
   }
-  console.log(`[DEBUG] Active notes after add: [${Array.from(activeNotes).join(', ')}], toggled: [${Array.from(toggledNotes).join(', ')}]`);
+  // console.log(`[DEBUG] Active notes after add: [${Array.from(activeNotes).join(', ')}], toggled: [${Array.from(toggledNotes).join(', ')}]`);
   updateChordDisplay(getActiveNotes());
 }
 
@@ -114,7 +114,7 @@ export function removeActiveNote(hex: ActiveHex): void {
   // Remove from both sets - the note could be in either one
   activeNotes.delete(hex.note);
   toggledNotes.delete(hex.note);
-  console.log(`[DEBUG] Active notes after remove: [${Array.from(activeNotes).join(', ')}], toggled: [${Array.from(toggledNotes).join(', ')}]`);
+  // console.log(`[DEBUG] Active notes after remove: [${Array.from(activeNotes).join(', ')}], toggled: [${Array.from(toggledNotes).join(', ')}]`);
   updateChordDisplay(getActiveNotes());
 }
 
@@ -171,13 +171,13 @@ export function isNoteActive(note: number): boolean {
 
 export function getActiveNotes(): number[] {
   const notes = Array.from(new Set([...activeNotes, ...toggledNotes]));
-  console.log(`[DEBUG] Getting active notes: [${notes.join(', ')}]`);
+  // console.log(`[DEBUG] Getting active notes: [${notes.join(', ')}]`);
   return notes;
 }
 
 export function activateNote(note: number): void {
   if (!settings) return;
-  console.log(`[DEBUG] Activating note: ${note}`);
+  // console.log(`[DEBUG] Activating note: ${note}`);
   
   // Then solve for coordinates that would give us this note
   // distance = x * rSteps + y * urSteps should equal note exactly

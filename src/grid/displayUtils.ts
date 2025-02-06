@@ -41,8 +41,39 @@ export function drawHex(coords: Point, color?: string): void {
   settings.context.closePath();
   settings.context.clip();
 
-  // Draw the base hex
-  settings.context.fillStyle = color || settings.keycolors[coords.x * settings.rSteps + coords.y * settings.urSteps];
+  // Get the base color
+  let fillColor = color || settings.keycolors[coords.x * settings.rSteps + coords.y * settings.urSteps];
+  
+  // If in learning mode, adjust color for non-chord notes
+  if (settings.learningChordSymbol?.length > 0) {
+    const note = coords.x * settings.rSteps + coords.y * settings.urSteps;
+    const equivSteps = settings.enum ? settings.equivSteps : settings.scale.length;
+    const reducedNote = ((note % equivSteps) + equivSteps) % equivSteps;
+    const currentNoteName = settings.names[reducedNote];
+        
+    // Get the chord spelling from tuningTypes and ensure it's an array
+    if (Array.isArray(settings.learningChord) && settings.learningChord.length > 0) {
+      // Convert current note and chord notes to the current notation system
+      const normalizedCurrentNote = convertNoteNameToSystem(currentNoteName, settings.notationSystem).replace(/\d+$/, ''); // Remove octave
+      const normalizedChordNotes = settings.learningChord.map((note: string) => 
+        convertNoteNameToSystem(note, settings.notationSystem).replace(/\d+$/, '')
+      ); // Remove octaves
+      
+      // Check if the current note is part of the chord
+      const isChordNote = normalizedChordNotes.includes(normalizedCurrentNote);
+      
+      if (!isChordNote) {
+        // Convert color to RGB
+        const rgb = hex2rgb(nameToHex(fillColor));
+        // Convert to grayscale and reduce intensity
+        const gray = Math.round((rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114) * 0.3);
+        fillColor = `rgb(${gray}, ${gray}, ${gray})`;
+      }
+    }
+  }
+
+  // Draw the base hex with potentially modified color
+  settings.context.fillStyle = fillColor;
   settings.context.fill();
 
   // Draw shadows on left edges
@@ -63,7 +94,7 @@ export function drawHex(coords: Point, color?: string): void {
   settings.context.filter = 'none';
   settings.context.globalCompositeOperation = 'source-over';
 
-  // Draw key image if enabled (after shadows, with normal blending)
+  // Draw key image if enabled
   if (settings.useKeyImage && settings.keyImage === 'hexagon') {
     settings.context.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     settings.context.lineWidth = 1.5;
@@ -121,9 +152,7 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
       displayNote = ((reducedNote - (settings.numberRoot || 0) + equivSteps) % equivSteps);
     }
     let name = settings.enum ? "" + displayNote : settings.names[reducedNote];
-    console.log('[DEBUG] Before conversion - name:', name, 'notationSystem:', settings.notationSystem);
     name = convertNoteNameToSystem(name, settings.notationSystem);
-    console.log('[DEBUG] After conversion - name:', name);
     
     if (!settings.enum && name) {
       settings.context.save();

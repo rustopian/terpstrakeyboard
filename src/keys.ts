@@ -23,6 +23,7 @@ import { ScrollManager } from './ui/ScrollManager';
 // Import settings manager
 import { SettingsManager } from './settings/SettingsManager';
 import { SETTINGS_31_EDO } from './settings/tuningTypes';
+import { convertNoteNameToSystem } from './utils/accidentalUtils';
 
 // Add WebMidi types
 declare global {
@@ -45,6 +46,8 @@ declare global {
     updateColorSaturation: () => void;
     updateKeyboardDisplay: () => void;
     settingsManager: SettingsManager;
+    setLearningMode: (chordData: { symbol: string; spelling: string[] }) => void;
+    clearLearningMode: () => void;
   }
 
   interface WebMidiOutput {
@@ -482,7 +485,6 @@ function populateLearningNoteDropdown() {
     
     // Get note names from the current tuning system
     const noteNames = settings.names.map(replaceAccidentals);
-    console.log('[DEBUG] Note names:', noteNames);
     noteNames.forEach((name, index) => {
         const option = document.createElement('option');
         option.value = index.toString();
@@ -542,59 +544,89 @@ document.head.appendChild(style);
 // Function to set learning mode
 function setLearningMode(chordData: { symbol: string; spelling: string[] }) {
     console.log('[DEBUG] setLearningMode called with chordData:', chordData);
-    // Update settings with the selected chord
-    settings.learningChord = chordData.spelling;
-    settings.learningChordSymbol = chordData.symbol;
-    console.log('[DEBUG] Updated settings.learningChordSymbol:', settings.learningChordSymbol);
+    
+    // Get the root note from the learning note root dropdown
+    const learningNoteRootSelect = document.getElementById('learning-note-root') as HTMLSelectElement;
+    const selectedRootIndex = parseInt(learningNoteRootSelect.value);
+    const selectedRootNote = settings.names[selectedRootIndex];
+    
+    // Convert chord spelling to steps relative to C
+    const equivSteps = settings.enum ? settings.equivSteps : settings.scale.length;
+    
+    // Get the steps for each note in the chord spelling relative to C
+    const chordSteps = chordData.spelling.map(note => {
+        // Remove octave and convert to standard notation first
+        const standardNote = convertNoteNameToSystem(note.replace(/\d+$/, ''), 'Standard');
+        // Find the index of this note in the scale
+        const noteIndex = settings.names.findIndex(n => 
+            convertNoteNameToSystem(n, 'Standard') === standardNote
+        );
+        return noteIndex;
+    });
+    
+    // Calculate relative steps from root
+    const rootSteps = chordSteps.map(step => ((step - chordSteps[0] + equivSteps) % equivSteps));
+    
+    // Now transpose these steps to the selected root
+    settings.learningChord = rootSteps.map(step => {
+        // Calculate the actual note index in the scale
+        const noteIndex = (selectedRootIndex + step) % equivSteps;
+        // Get the note name and convert to the current notation system
+        return convertNoteNameToSystem(settings.names[noteIndex], settings.notationSystem) + '4';
+    });
+    
+    // Update the chord symbol with the new root note
+    settings.learningChordSymbol = chordData.symbol.replace(/^[A-G][b#♯♭]*/, selectedRootNote);
+    
+    console.log('[DEBUG] Chord transposition:', {
+        originalSpelling: chordData.spelling,
+        chordSteps,
+        rootSteps,
+        selectedRootIndex,
+        transposedChord: settings.learningChord,
+        symbol: settings.learningChordSymbol
+    });
     
     // Update URL with learningChord symbol
     const url = new URL(window.location.href);
-    url.searchParams.set('learningChord', encodeURIComponent(chordData.symbol));
+    url.searchParams.set('learningChord', encodeURIComponent(settings.learningChordSymbol));
     window.history.replaceState({}, '', url.toString());
-    console.log('[DEBUG] Updated URL with learningChord:', url.toString());
 
     // Update UI to reflect selected chord
     const chordList = document.getElementById('chord-list');
     if (chordList) {
         chordList.querySelectorAll('li').forEach(li => {
             li.classList.remove('selected');
+            if (li.textContent === settings.learningChordSymbol) {
+                li.classList.add('selected');
+            }
         });
-        const selectedChord = Array.from(chordList.children).find(li => li.textContent === chordData.symbol);
-        if (selectedChord) {
-            selectedChord.classList.add('selected');
-        }
     }
 
-    updateKeyboardDisplay();
+    // Force a redraw of the entire keyboard
+    drawGrid();
 }
 
-// Update keyboard display to highlight learning mode
-function updateKeyboardDisplay() {
-    // Clear the canvas
-    if (settings.canvas && settings.context) {
-        settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
-    }
-
-    // Draw the grid
-    drawGrid();
-
-    // Highlight learning mode
-    if (settings.learningChord) {
-        const hexes = settings.activeHexObjects;
-        hexes.forEach(hex => {
-            const noteNumber = hex.note;
-            // Check if the note is part of the learning chord
-            if (settings.learningChord.includes(noteNumber.toString())) {
-                // Set full opacity for chord notes
-                hex.opacity = 1.0;
-            } else {
-                // Set opacity to 20% for non-chord notes
-                hex.opacity = 0.2;
-            }
-            // Redraw hex with updated opacity
-            hex.draw(settings.context);
+// Add function to clear learning mode
+function clearLearningMode() {
+    settings.learningChord = [];
+    settings.learningChordSymbol = '';
+    
+    // Remove from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('learningChord');
+    window.history.replaceState({}, '', url.toString());
+    
+    // Clear UI selection
+    const chordList = document.getElementById('chord-list');
+    if (chordList) {
+        chordList.querySelectorAll('li').forEach(li => {
+            li.classList.remove('selected');
         });
     }
+    
+    // Force a redraw
+    drawGrid();
 }
 
 // Initialize learning functions
@@ -602,3 +634,7 @@ function initLearningFunctions() {
     populateLearningNoteDropdown();
     populateChordList();
 }
+
+// Make the functions available globally
+window.setLearningMode = setLearningMode;
+window.clearLearningMode = clearLearningMode;
