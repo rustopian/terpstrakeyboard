@@ -142,11 +142,15 @@ export class SettingsManager {
 
         // Update volume for all active notes
         for (const hex of this.settings.activeHexObjects) {
-            if (hex.nodeId && this.settings.activeSources[hex.nodeId as any] ) {
+            if (hex.nodeId && this.settings.activeSources[hex.nodeId as any]) {
                 const gainNode = this.settings.activeSources[hex.nodeId as any].gainNode;
-                gainNode.gain.setValueAtTime(
+                const currentTime = this.settings.audioContext.currentTime;
+                // Use a short ramp time for smooth transitions
+                const rampTime = 0.05; // 50ms ramp
+                gainNode.gain.cancelScheduledValues(currentTime);
+                gainNode.gain.linearRampToValueAtTime(
                     this.settings.tiltVolume,
-                    this.settings.audioContext.currentTime
+                    currentTime + rampTime
                 );
             }
         }
