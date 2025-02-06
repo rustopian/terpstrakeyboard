@@ -126,48 +126,8 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
       scaleFactor *= settings.hexSize / 50;
       settings.context.scale(scaleFactor, scaleFactor);
       
-      // Handle special character kerning
-      const specialChars = ['♭', '♯', '↑', '↓', '⟊', '⟋', '𝄢', '𝄣', '𝄲', '𝄳', '𝄱'];
-      if (specialChars.some(char => name.includes(char))) {
-        // Split name into parts around special characters
-        let parts = [];
-        let currentPart = '';
-        for (let i = 0; i < name.length; i++) {
-          const char = name[i];
-          if (specialChars.includes(char)) {
-            if (currentPart) parts.push(currentPart);
-            parts.push(char);
-            currentPart = '';
-          } else {
-            currentPart += char;
-          }
-        }
-        if (currentPart) parts.push(currentPart);
-
-        // Calculate total width with kerning
-        const kerningAmount = -0.3;
-        let totalWidth = 0;
-        parts.forEach((part, i) => {
-          totalWidth += settings.context.measureText(part).width;
-          if (specialChars.includes(part) && i < parts.length - 1) {
-            totalWidth += kerningAmount * settings.context.measureText(part).width;
-          }
-        });
-
-        // Draw each part with kerning
-        let x = -totalWidth / 2;
-        parts.forEach((part, i) => {
-          settings.context.textAlign = "left";
-          settings.context.fillText(part, x, 0);
-          x += settings.context.measureText(part).width;
-          if (specialChars.includes(part) && i < parts.length - 1) {
-            x += kerningAmount * settings.context.measureText(part).width;
-          }
-        });
-      } else {
-        settings.context.textAlign = "center";
-        settings.context.fillText(name, 0, 0);
-      }
+      settings.context.textAlign = "center";
+      settings.context.fillText(name, 0, 0);
       settings.context.restore();
     }
 

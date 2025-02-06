@@ -789,6 +789,17 @@ export class SettingsManager {
                 }
             });
 
+            // Handle notation system before other parameters
+            if (params.has('notationSystem')) {
+                const notationSystem = params.get('notationSystem');
+                const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+                if (notationSelect && notationSystem) {
+                    notationSelect.value = notationSystem;
+                    this.settings.notationSystem = notationSystem;
+                    console.log('[DEBUG] Loaded notation system from URL:', notationSystem);
+                }
+            }
+
             // Special handling for number-root before anything else
             if ('number-root' in paramObj) {
                 const rootValue = parseInt(paramObj['number-root']);
@@ -799,6 +810,18 @@ export class SettingsManager {
 
             // Update form with URL parameters
             this.updateFromPreset(paramObj);
+
+            // Ensure notation system is not overwritten by preset
+            if (params.has('notationSystem')) {
+                const notationSystem = params.get('notationSystem');
+                if (notationSystem) {
+                    this.settings.notationSystem = notationSystem;
+                    const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+                    if (notationSelect) {
+                        notationSelect.value = notationSystem;
+                    }
+                }
+            }
 
             // Ensure the dropdown is populated with current note names
             this.populateNumberRootDropdown();
@@ -914,7 +937,7 @@ export class SettingsManager {
         });
 
         // Handle notation system
-        const notationSystem = parameters['notation-system'] || 'Standard';
+        const notationSystem = parameters.notationSystem || 'Standard';
         const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
         if (notationSelect) {
             notationSelect.value = notationSystem;
@@ -1126,15 +1149,25 @@ export class SettingsManager {
         }
 
         function getElementValue(id: string): string {
-            const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
-            if (!element) return '';
-            if (element.type === 'checkbox') return element.checked.toString();
-            return element.value;
+            const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+            return element ? element.value : '';
+        }
+
+        // Add notation system to URL parameters
+        const notationSystem = getElementValue('notation-system');
+        if (notationSystem) {
+            url.searchParams.set('notationSystem', notationSystem);
+        }
+
+        // Add all other parameters
+        const fundamental = getElementValue('fundamental');
+        if (fundamental) {
+            url.searchParams.set('fundamental', fundamental);
         }
 
         // Add modified parameters to URL
         const params = [
-            "pitch-type", "fundamental", "rSteps", "urSteps", "hexSize", "rotation",
+            "pitch-type", "rSteps", "urSteps", "hexSize", "rotation",
             "instrument", "enum", "equivSteps", "spectrum_colors",
             "fundamental_color", "no_labels", "midi_input", "invert-updown",
             "show_intervals", "show_all_notes", "key-image", "full-chord-notation",

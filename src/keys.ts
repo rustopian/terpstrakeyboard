@@ -76,6 +76,10 @@ const getData = new QueryData();
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("[DEBUG] Starting DOMContentLoaded initialization...");
     
+    // Initialize settings manager first
+    window.settingsManager = new SettingsManager();
+    settings = settingsManager.getSettings();
+
     // Hide settings dialog and landing page immediately
     console.log("[DEBUG] Hiding settings dialog and landing page...");
     const landingPage = document.getElementById("landing-page");
@@ -86,6 +90,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (overlay) overlay.classList.remove('active');
     if (settingsButton) settingsButton.style.display = 'block';
     document.body.style.overflow = 'hidden';
+
+    // Initialize custom select for notation system
+    const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+    if (notationSelect) {
+        // Get notation system from URL or use default
+        const urlParams = new URLSearchParams(window.location.search);
+        const notationSystem = urlParams.get('notationSystem') || 'Standard';
+        notationSelect.value = notationSystem;
+        settings.notationSystem = notationSystem;
+        console.log("[DEBUG] Initial notation system:", notationSystem);
+    }
 
     // Show keyboard element immediately
     console.log("[DEBUG] Showing keyboard element...");
@@ -305,6 +320,22 @@ function showSettings(): void {
   const landingPage = document.getElementById('landing-page');
   const settingsButton = document.getElementById('settings-button');
   
+  // Update notation system dropdown to match current settings
+  const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+  if (notationSelect && settings.notationSystem) {
+    notationSelect.value = settings.notationSystem;
+    
+    // Also update the custom select display if it exists
+    const customSelect = document.querySelector('.custom-select') as HTMLElement;
+    if (customSelect) {
+      const selectedOption = Array.from(notationSelect.options)
+        .find(option => option.value === settings.notationSystem);
+      if (selectedOption) {
+        customSelect.innerHTML = `${selectedOption.text}`;
+      }
+    }
+  }
+  
   if (overlay) overlay.classList.add('active');
   if (landingPage) landingPage.style.display = 'block';
   if (settingsButton) settingsButton.style.display = 'none';
@@ -407,9 +438,6 @@ async function goKeyboard(): Promise<boolean> {
 
     return false;
 }
-
-// Initialize the settings manager
-window.settingsManager = new SettingsManager();
 
 // Ensure settings are loaded before populating the dropdown
 settings = settingsManager.getSettings();
