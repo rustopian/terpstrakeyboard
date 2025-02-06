@@ -57,6 +57,7 @@ export interface Settings {
   toggle_mode: boolean;
   learningChord: string[];
   learningChordSymbol: string;
+  notationSystem: string;
 }
 
 // Default settings
@@ -113,5 +114,6 @@ export const defaultSettings: Settings = {
   midi_input: false,
   toggle_mode: false,
   learningChord: [],
-  learningChordSymbol: ''
+  learningChordSymbol: '',
+  notationSystem: 'Standard'
 }; 

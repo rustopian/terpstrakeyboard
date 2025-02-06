@@ -18,6 +18,7 @@ import {
     hasDisplayProps,
     hasGridProps
 } from './SettingsTypes';
+import { convertNoteNameToSystem } from '../utils/accidentalUtils';
 
 /**
  * Structure for a preset configuration
@@ -255,6 +256,12 @@ export class SettingsManager {
             if (!isNaN(numberRootValue)) {
                 this.settings.numberRoot = numberRootValue;
             }
+        }
+
+        // Load notation system setting
+        const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+        if (notationSelect) {
+            this.settings.notationSystem = notationSelect.value;
         }
     }
 
@@ -906,6 +913,14 @@ export class SettingsManager {
             }
         });
 
+        // Handle notation system
+        const notationSystem = parameters['notation-system'] || 'Standard';
+        const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+        if (notationSelect) {
+            notationSelect.value = notationSystem;
+            this.settings.notationSystem = notationSystem;
+        }
+
         // Update note configuration
         this.updateNoteConfigFromPreset(parameters);
 
@@ -1174,6 +1189,18 @@ export class SettingsManager {
         window.history.replaceState({}, '', url.toString());
     }
 
+    public updateNotationSystem(): void {
+        const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+        if (!notationSelect) return;
+
+        // Just update the notation system setting without converting note names
+        this.settings.notationSystem = notationSelect.value;
+
+        // Update the keyboard display
+        this.updateKeyboardDisplay();
+        this.changeURL();
+    }
+
     // Initialize settings
     public initialize(): void {
         // Initialize settings object
@@ -1269,5 +1296,12 @@ export class SettingsManager {
 
         // Initial keyboard display update
         this.updateKeyboardDisplay();
+
+        // Add event listener for notation system dropdown
+        const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+        if (notationSelect) {
+            notationSelect.value = this.settings.notationSystem;
+            notationSelect.addEventListener('change', () => this.updateNotationSystem());
+        }
     }
 } 

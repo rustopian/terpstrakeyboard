@@ -14,6 +14,85 @@
     
     <link rel="manifest" href="/manifest.webmanifest"> <!-- added to enable Android Firefox users to add the web app to the home screen -->
 
+    <!-- Add Noto Sans Symbols fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&display=swap" rel="stylesheet">
+
+    <!-- Update font stack in style -->
+    <style>
+        @font-face {
+            font-family: 'Ekmelos';
+            src: url('/fonts/Ekmelos.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+            font-display: block;
+        }
+        
+        /* Custom dropdown styling */
+        .custom-select-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .custom-select, .custom-select-option {
+            position: relative;
+            background-color: white;
+            border: 1px solid #D1D1D1;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+        }
+
+        /* Style for the musical symbols specifically */
+        .notation-symbols {
+            font-family: 'Ekmelos', sans-serif !important;
+            display: inline-block;
+            margin-left: 8px;
+        }
+
+        .custom-select-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: white;
+            border: 1px solid #D1D1D1;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .custom-select-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: 'Ekmelos', sans-serif !important;
+            font-size: 18px;
+        }
+
+        .custom-select-option:hover {
+            background-color: #f0f0f0;
+        }
+
+        .custom-select-option.selected {
+            background-color: #e0e0e0;
+        }
+
+        /* Hide the original select */
+        #notation-system {
+            display: none;
+        }
+    </style>
+
+    <!-- Preload fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols&family=Noto+Sans+Symbols+2&display=swap" as="style">
+
+    <!-- Preload the Ekmelos font -->
+    <link rel="preload" href="/fonts/Ekmelos.woff" as="font" type="font/woff" crossorigin>
+
 	<script src="/src/jscolor.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/webmidi@latest/dist/iife/webmidi.iife.min.js"></script>
 	<script type="module" src="/src/keys.ts"></script>
@@ -195,6 +274,17 @@
 										<option value="protanopia">Protanopia</option>
 										<option value="deuteranopia">Deuteranopia</option>
 										<option value="tritanopia">Tritanopia</option>
+									</select>
+								</div>
+
+								<div class="control-group">
+									<label>Notation System</label>
+									<select id="notation-system" class="u-full-width" onchange="window.settingsManager.updateNotationSystem();">
+										<option value="Standard">Standard (&#xE27A; &#xE27B; &#xE262; &#xE260;) [E27A E27B E262 E260]</option>
+										<option value="Sagittal">Sagittal (&#xE30A; &#xE30B; &#xE318; &#xE319;) [E30A E30B E318 E319]</option>
+										<option value="Mixed Sagittal">Mixed Sagittal (&#xE30A; &#xE30B; &#xE262; &#xE260;) [E30A E30B E262 E260]</option>
+										<option value="Stein/Zimmermann">Stein/Zimmermann (&#xE282; &#xE284; &#xE262; &#xE260;) [E282 E284 E262 E260]</option>
+										<option value="Stein/Half-Flat">Stein/Half-Flat (&#xE282; &#xF612; &#xE262; &#xE260;) [E282 F612 E262 E260]</option>
 									</select>
 								</div>
 
@@ -395,6 +485,73 @@ Temper | 31-ed2 Bosanquet / Wilson / Terpstra
 				// Add active class to clicked button and corresponding content
 				button.classList.add('active');
 				document.getElementById(button.dataset.tab)?.classList.add('active');
+			});
+		});
+
+		// Add font loading check
+		document.fonts.ready.then(function() {
+			console.log('Fonts loaded:', document.fonts.check('1em "Bravura Text"'));
+		});
+
+		// Add font loading check
+		document.fonts.ready.then(function() {
+			console.log('Ekmelos font loaded:', document.fonts.check('1em "Ekmelos"'));
+		});
+
+		// Custom dropdown functionality
+		document.addEventListener('DOMContentLoaded', function() {
+			const notationSystems = [
+				{ value: 'Standard', label: 'Standard', symbols: '\uE27A \uE27B \uE262 \uE260' },
+				{ value: 'Sagittal', label: 'Sagittal', symbols: '\uE30A \uE30B \uE318 \uE319' },
+				{ value: 'Mixed Sagittal', label: 'Mixed Sagittal', symbols: '\uE30A \uE30B \uE262 \uE260' },
+				{ value: 'Stein/Zimmermann', label: 'Stein/Zimmermann', symbols: '\uE282 \uE284 \uE262 \uE260' },
+				{ value: 'Stein/Half-Flat', label: 'Stein/Half-Flat', symbols: '\uE282 \uF612 \uE262 \uE260' }
+			];
+
+			const select = document.getElementById('notation-system');
+			const wrapper = document.createElement('div');
+			wrapper.className = 'custom-select-wrapper';
+			select.parentNode.insertBefore(wrapper, select);
+
+			const customSelect = document.createElement('div');
+			customSelect.className = 'custom-select';
+			wrapper.appendChild(customSelect);
+
+			const optionsContainer = document.createElement('div');
+			optionsContainer.className = 'custom-select-options';
+			wrapper.appendChild(optionsContainer);
+
+			notationSystems.forEach(system => {
+				const option = document.createElement('div');
+				option.className = 'custom-select-option';
+				option.setAttribute('data-value', system.value);
+				option.innerHTML = `${system.label}<span class="notation-symbols">(${system.symbols})</span>`;
+				optionsContainer.appendChild(option);
+
+				option.addEventListener('click', function() {
+					select.value = system.value;
+					customSelect.innerHTML = `${system.label}<span class="notation-symbols">(${system.symbols})</span>`;
+					optionsContainer.style.display = 'none';
+					// Trigger the change event on the original select
+					const event = new Event('change');
+					select.dispatchEvent(event);
+				});
+			});
+
+			// Set initial value
+			const initialSystem = notationSystems[0];
+			customSelect.innerHTML = `${initialSystem.label}<span class="notation-symbols">(${initialSystem.symbols})</span>`;
+
+			// Toggle dropdown
+			customSelect.addEventListener('click', function(e) {
+				e.stopPropagation();
+				const isVisible = optionsContainer.style.display === 'block';
+				optionsContainer.style.display = isVisible ? 'none' : 'block';
+			});
+
+			// Close dropdown when clicking outside
+			document.addEventListener('click', function() {
+				optionsContainer.style.display = 'none';
 			});
 		});
 	</script>

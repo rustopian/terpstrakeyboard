@@ -343,3 +343,37 @@ select#quicklinks {
 .modal-overlay.active + .scroll-area {
   display: none;
 }
+
+#notation-system {
+    font-family: 'Bravura Text', 'Noto Sans Symbols 2', 'Noto Sans Symbols', 'Noto Music', Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 8px;
+    width: 100%;
+    -webkit-appearance: menulist-button;
+    appearance: menulist-button;
+    background-color: #fff;
+}
+
+#notation-system option {
+    font-family: 'Bravura Text', 'Noto Sans Symbols 2', 'Noto Sans Symbols', 'Noto Music', Arial, sans-serif;
+    font-size: 16px;
+    padding: 4px 8px;
+    background-color: #fff;
+}
+
+/* Force font rendering for Webkit/Blink browsers */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+    #notation-system,
+    #notation-system option {
+        font-family: 'Bravura Text', 'Noto Sans Symbols 2', 'Noto Sans Symbols', 'Noto Music', Arial, sans-serif !important;
+    }
+}
+
+/* Force font rendering for Firefox */
+@-moz-document url-prefix() {
+    #notation-system,
+    #notation-system option {
+        font-family: 'Bravura Text', 'Noto Sans Symbols 2', 'Noto Sans Symbols', 'Noto Music', Arial, sans-serif !important;
+    }
+}

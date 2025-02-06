@@ -5,6 +5,7 @@ import { nameToHex, hex2rgb, rgb2hsv, HSVtoRGB, rgb } from '../color/colorUtils'
 import { CentsResult } from '../core/types';
 import type { DisplaySettings } from '../settings/SettingsTypes';
 import { hasDisplayProps } from '../settings/SettingsTypes';
+import { convertNoteNameToSystem } from '../utils/accidentalUtils';
 
 let settings: DisplaySettings;
 export let current_text_color = "#000000";
@@ -98,7 +99,7 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
 
   settings.context.fillStyle = current_text_color;
   const baseSize = 22 * (settings.textSize || 1); // textSize ranges from 0.2 to 1.0
-  settings.context.font = `${baseSize}pt Arial`;
+  settings.context.font = `${baseSize}pt "Ekmelos", "Bravura Text", "Noto Music", Arial`;
   settings.context.textAlign = "center";
   settings.context.textBaseline = "middle";
 
@@ -116,30 +117,53 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
     if (settings.enum && typeof settings.numberRoot === 'number') {
       displayNote = ((reducedNote - (settings.numberRoot || 0) + equivSteps) % equivSteps);
     }
-    const name = settings.enum ? "" + displayNote : settings.names[reducedNote];
-    if (name) {
+    let name = settings.enum ? "" + displayNote : settings.names[reducedNote];
+    name = convertNoteNameToSystem(name, settings.notationSystem);
+    
+    if (!settings.enum && name) {
       settings.context.save();
       let scaleFactor = name.length > 3 ? 3 / name.length : 1;
       scaleFactor *= settings.hexSize / 50;
       settings.context.scale(scaleFactor, scaleFactor);
       
-      // Handle flat symbol kerning - adjust kerning for flat symbol (♭)
-      const flatSymbol = '♭';
-      if (name.includes(flatSymbol)) {
-        // Split and clean any whitespace around the flat symbol
-        const parts = name.split(flatSymbol).map(part => part.trim());
-        const beforeFlat = parts[0];
-        const afterFlat = parts.slice(1).join(flatSymbol).trim();
-        // Increase kerning amount significantly
-        const flatKerning = -0.3 * settings.context.measureText(flatSymbol).width;
-        const totalWidth = settings.context.measureText(name).width + flatKerning;
-        
-        // Center the entire note name by offsetting by half the total width
-        const centerOffset = -totalWidth / 2;
-        
-        settings.context.textAlign = "left";
-        settings.context.fillText(beforeFlat, centerOffset, 0);
-        settings.context.fillText(flatSymbol + afterFlat, centerOffset + settings.context.measureText(beforeFlat).width + flatKerning, 0);
+      // Handle special character kerning
+      const specialChars = ['♭', '♯', '↑', '↓', '⟊', '⟋', '𝄢', '𝄣', '𝄲', '𝄳', '𝄱'];
+      if (specialChars.some(char => name.includes(char))) {
+        // Split name into parts around special characters
+        let parts = [];
+        let currentPart = '';
+        for (let i = 0; i < name.length; i++) {
+          const char = name[i];
+          if (specialChars.includes(char)) {
+            if (currentPart) parts.push(currentPart);
+            parts.push(char);
+            currentPart = '';
+          } else {
+            currentPart += char;
+          }
+        }
+        if (currentPart) parts.push(currentPart);
+
+        // Calculate total width with kerning
+        const kerningAmount = -0.3;
+        let totalWidth = 0;
+        parts.forEach((part, i) => {
+          totalWidth += settings.context.measureText(part).width;
+          if (specialChars.includes(part) && i < parts.length - 1) {
+            totalWidth += kerningAmount * settings.context.measureText(part).width;
+          }
+        });
+
+        // Draw each part with kerning
+        let x = -totalWidth / 2;
+        parts.forEach((part, i) => {
+          settings.context.textAlign = "left";
+          settings.context.fillText(part, x, 0);
+          x += settings.context.measureText(part).width;
+          if (specialChars.includes(part) && i < parts.length - 1) {
+            x += kerningAmount * settings.context.measureText(part).width;
+          }
+        });
       } else {
         settings.context.textAlign = "center";
         settings.context.fillText(name, 0, 0);
@@ -151,7 +175,7 @@ function drawHexLabel(coords: Point, hexCenter: Point): void {
     settings.context.scale(scaleFactor, scaleFactor);
     settings.context.translate(10, -25);
     settings.context.fillStyle = current_text_color;
-    settings.context.font = `${baseSize * 0.55}pt Arial`; // Smaller font for octave number
+    settings.context.font = `${baseSize * 0.55}pt Arial`;
     settings.context.textAlign = "center";
     settings.context.textBaseline = "middle";
     settings.context.fillText((equivMultiple + (settings.octaveOffset || 0) + 4).toString(), 0, 0);

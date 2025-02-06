@@ -1,0 +1,3 @@
+[submodule "ekmelos"]
+	path = ekmelos
+	url = https://github.com/tr-igem/ekmelos.git

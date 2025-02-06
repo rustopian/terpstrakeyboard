@@ -935,4 +935,114 @@ export const SETTINGS_53_EDO: TuningSystem = {
     'Augmented (downaug)':    ['C4', '↓E4', '↓↓G♯4'],
     'Orwell':                 ['C4', '↓E4', '↓↓G4', '↑A4'],
   },
-}; 
+};
+
+// Accidental step values enum
+export enum AccidentalStep {
+    DOWN4 = -4,
+    DOWN3 = -3,
+    DOWN2 = -2,
+    DOWN1 = -1,
+    NATURAL = 0,
+    UP1 = 1,
+    UP2 = 2,
+    UP3 = 3,
+    UP4 = 4
+}
+
+// Accidental system type definition
+export type AccidentalSystem = {
+    name: string;
+    symbols: {
+        [AccidentalStep.UP1]: string;
+        [AccidentalStep.DOWN1]: string;
+        [AccidentalStep.UP2]: string;
+        [AccidentalStep.DOWN2]: string;
+        [AccidentalStep.UP3]?: string;
+        [AccidentalStep.DOWN3]?: string;
+        [AccidentalStep.UP4]?: string;
+        [AccidentalStep.DOWN4]?: string;
+    };
+};
+
+// Define available accidental systems
+export const ACCIDENTAL_SYSTEMS: AccidentalSystem[] = [
+    {
+      name: "Manually Entered Symbols",
+      symbols: {
+        [AccidentalStep.UP1]: "^",
+        [AccidentalStep.DOWN1]: "v",
+        [AccidentalStep.UP2]: "#",
+        [AccidentalStep.DOWN2]: "b",
+        [AccidentalStep.UP3]: "^#",
+        [AccidentalStep.DOWN3]: "v#",
+        [AccidentalStep.UP4]: "##",
+        [AccidentalStep.DOWN4]: "bb"
+      }
+    },
+    {
+        name: "Standard",
+        symbols: {
+            [AccidentalStep.UP1]: "\uE27A",      // U+E27A (up arrow)
+            [AccidentalStep.DOWN1]: "\uE27B",     // U+E27B (down arrow)
+            [AccidentalStep.UP2]: "\uE262",       // U+E262 (sharp)
+            [AccidentalStep.DOWN2]: "\uE260",     // U+E260 (flat)
+            [AccidentalStep.UP3]: "\uE27A\uE262", // U+E27A U+E262 (up arrow + sharp)
+            [AccidentalStep.DOWN3]: "\uE27B\uE260", // U+E27B U+E260 (down arrow + flat)
+            [AccidentalStep.UP4]: "\uE263",       // U+E263 (double sharp)
+            [AccidentalStep.DOWN4]: "\uE264"      // U+E264 (double flat)
+        }
+    },
+    {
+        name: "Sagittal",
+        symbols: {
+            [AccidentalStep.UP1]: "\uE30A",      // U+E30A
+            [AccidentalStep.DOWN1]: "\uE30B",     // U+E30B
+            [AccidentalStep.UP2]: "\uE318",       // U+E318
+            [AccidentalStep.DOWN2]: "\uE319",     // U+E319
+            [AccidentalStep.UP3]: "\uE326",       // U+E326
+            [AccidentalStep.DOWN3]: "\uE327",     // U+E327
+            [AccidentalStep.UP4]: "\uE334",       // U+E334
+            [AccidentalStep.DOWN4]: "\uE335"      // U+E335
+        }
+    },
+    {
+        name: "Mixed Sagittal",
+        symbols: {
+            [AccidentalStep.UP1]: "\uE30A",      // U+E30A
+            [AccidentalStep.DOWN1]: "\uE30B",     // U+E30B
+            [AccidentalStep.UP2]: "\uE262",       // U+E262 (sharp)
+            [AccidentalStep.DOWN2]: "\uE260",     // U+E260 (flat)
+            [AccidentalStep.UP3]: "\uE30A\uE262", // U+E30A U+E262
+            [AccidentalStep.DOWN3]: "\uE30B\uE260", // U+E30B U+E260
+            [AccidentalStep.UP4]: "\uE47D",       // U+E47D
+            [AccidentalStep.DOWN4]: "\uE264"      // U+E264 (double flat)
+        }
+    },
+    {
+        name: "Stein/Zimmermann",
+        symbols: {
+            [AccidentalStep.UP1]: "\uE282",      // U+E282
+            [AccidentalStep.DOWN1]: "\uE284",     // U+E284
+            [AccidentalStep.UP2]: "\uE262",       // U+E262 (sharp)
+            [AccidentalStep.DOWN2]: "\uE260",     // U+E260 (flat)
+            [AccidentalStep.UP3]: "\uE283",       // U+E283
+            [AccidentalStep.DOWN3]: "\uE285",     // U+E285
+            [AccidentalStep.UP4]: "\uE263",       // U+E263 (double sharp)
+            [AccidentalStep.DOWN4]: "\uE264"      // U+E264 (double flat)
+        }
+    },
+    {
+        name: "Stein/Half-Flat",
+        symbols: {
+            [AccidentalStep.UP1]: "\uE282",      // U+E282
+            [AccidentalStep.DOWN1]: "\uF612",     // U+F612
+            [AccidentalStep.UP2]: "\uE262",       // U+E262 (sharp)
+            [AccidentalStep.DOWN2]: "\uE260",     // U+E260 (flat)
+            [AccidentalStep.UP3]: "\uE283",       // U+E283
+            [AccidentalStep.DOWN3]: "\uF613",     // U+F613
+            [AccidentalStep.UP4]: "\uE263",       // U+E263 (double sharp)
+            [AccidentalStep.DOWN4]: "\uE264"      // U+E264 (double flat)
+        }
+    }
+]; 
