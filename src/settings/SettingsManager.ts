@@ -18,7 +18,6 @@ import {
     hasDisplayProps,
     hasGridProps
 } from './SettingsTypes';
-import { convertNoteNameToSystem } from '../utils/accidentalUtils';
 
 /**
  * Structure for a preset configuration
@@ -54,9 +53,103 @@ interface PresetGroups {
 export class SettingsManager {
     private settings: Settings;
     private presets: PresetGroups = {};
+    private tiltSensorSubscription: number | null = null;
 
     constructor() {
         this.settings = { ...defaultSettings };
+    }
+
+    public updateTiltVolume(): void {
+        const enabledCheckbox = document.getElementById('tilt_volume_enabled') as HTMLInputElement;
+        const axisSelect = document.getElementById('tilt_volume_axis') as HTMLSelectElement;
+        
+        this.settings.tiltVolumeEnabled = enabledCheckbox.checked;
+        this.settings.tiltVolumeAxis = axisSelect.value as 'x' | 'z';
+        
+        if (this.settings.tiltVolumeEnabled) {
+            this.startTiltSensor();
+        } else {
+            this.stopTiltSensor();
+            // Reset volume to full
+            this.settings.tiltVolume = 1.0;
+            this.updateAllActiveNoteVolumes();
+        }
+    }
+
+    private startTiltSensor(): void {
+        // Check if DeviceOrientationEvent is available
+        if (!window.DeviceOrientationEvent) {
+            console.warn('Device orientation not supported');
+            return;
+        }
+
+        // Request permission if needed (iOS 13+)
+        if ((DeviceOrientationEvent as any).requestPermission) {
+            (DeviceOrientationEvent as any).requestPermission()
+                .then((response: string) => {
+                    if (response === 'granted') {
+                        this.attachTiltListener();
+                    }
+                })
+                .catch(console.error);
+        } else {
+            this.attachTiltListener();
+        }
+    }
+
+    private attachTiltListener(): void {
+        const handleOrientation = (event: DeviceOrientationEvent) => {
+            if (!this.settings.tiltVolumeEnabled) return;
+
+            // beta is front-to-back tilt (x-axis)
+            // gamma is left-to-right tilt (z-axis)
+            const angle = this.settings.tiltVolumeAxis === 'x' ? event.beta : event.gamma;
+            
+            if (angle !== null) {
+                // Map -45° to 45° to volume range 0 to 1
+                const volume = this.mapTiltToVolume(angle, -45, 45);
+                if (this.settings.tiltVolume !== volume) {
+                    this.settings.tiltVolume = volume;
+                    this.updateAllActiveNoteVolumes();
+                }
+            }
+        };
+
+        window.addEventListener('deviceorientation', handleOrientation);
+        this.tiltSensorSubscription = window.setInterval(() => {
+            // Keep screen on for tilt control
+            if (navigator.wakeLock) {
+                navigator.wakeLock.request('screen').catch(console.error);
+            }
+        }, 30000);
+    }
+
+    private stopTiltSensor(): void {
+        window.removeEventListener('deviceorientation', () => {});
+        if (this.tiltSensorSubscription) {
+            window.clearInterval(this.tiltSensorSubscription);
+            this.tiltSensorSubscription = null;
+        }
+    }
+
+    private mapTiltToVolume(angle: number, minAngle: number, maxAngle: number): number {
+        const clamped = Math.max(minAngle, Math.min(maxAngle, angle));
+        return (clamped - minAngle) / (maxAngle - minAngle);
+    }
+
+    private updateAllActiveNoteVolumes(): void {
+        if (!this.settings.audioContext) return;
+
+        // Update volume for all active notes
+        for (const hex of this.settings.activeHexObjects) {
+            if (hex.nodeId && this.settings.activeSources[hex.nodeId as any] ) {
+                const gainNode = this.settings.activeSources[hex.nodeId as any].gainNode;
+                gainNode.gain.setValueAtTime(
+                    this.settings.tiltVolume,
+                    this.settings.audioContext.currentTime
+                );
+            }
+        }
     }
 
     /**

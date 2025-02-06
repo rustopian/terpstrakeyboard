@@ -58,6 +58,9 @@ export interface Settings {
   learningChord: string[];
   learningChordSymbol: string;
   notationSystem: string;
+  tiltVolumeEnabled: boolean;
+  tiltVolumeAxis: 'x' | 'z';  // 'x' for front-to-back, 'z' for left-to-right
+  tiltVolume: number;  // Current volume multiplier from tilt [0-1]
 }
 
 // Default settings
@@ -115,5 +118,8 @@ export const defaultSettings: Settings = {
   toggle_mode: false,
   learningChord: [],
   learningChordSymbol: '',
-  notationSystem: 'Standard'
-}; 
+  notationSystem: 'Standard',
+  tiltVolumeEnabled: false,
+  tiltVolumeAxis: 'x',
+  tiltVolume: 1.0
+};

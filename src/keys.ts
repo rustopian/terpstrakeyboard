@@ -27,39 +27,39 @@ import { convertNoteNameToSystem } from './utils/accidentalUtils';
 
 // Add WebMidi types
 declare global {
-  interface Window {
-    settings: Settings;
-    back: () => void;
-    changeURL: () => void;
-    noPreset: () => void;
-    hideRevealColors: () => void;
-    hideRevealNames: () => void;
-    hideRevealEnum: () => void;
-    WebMidi: {
-      enable: () => Promise<void>;
-      disable: () => void;
-      enabled: boolean;
-      outputs: WebMidiOutput[];
-      getOutputByName: (name: string) => WebMidiOutput;
-    };
-    updateColorVisionMode: () => void;
-    updateColorSaturation: () => void;
-    updateKeyboardDisplay: () => void;
-    settingsManager: SettingsManager;
-    setLearningMode: (chordData: { symbol: string; spelling: string[] }) => void;
-    clearLearningMode: () => void;
-  }
+    interface Window {
+        settings: Settings;
+        back: () => void;
+        changeURL: () => void;
+        noPreset: () => void;
+        hideRevealColors: () => void;
+        hideRevealNames: () => void;
+        hideRevealEnum: () => void;
+        WebMidi: {
+            enable: () => Promise<void>;
+            disable: () => void;
+            enabled: boolean;
+            outputs: WebMidiOutput[];
+            getOutputByName: (name: string) => WebMidiOutput;
+        };
+        updateColorVisionMode: () => void;
+        updateColorSaturation: () => void;
+        updateKeyboardDisplay: () => void;
+        settingsManager: SettingsManager;
+        setLearningMode: (chordData: { symbol: string; spelling: string[] }) => void;
+        clearLearningMode: () => void;
+    }
 
-  interface WebMidiOutput {
-    name: string;
-    sendAllSoundOff: () => void;
-    playNote: (note: number, channels: number[]) => void;
-    stopNote: (note: number, channels: number[]) => void;
-  }
+    interface WebMidiOutput {
+        name: string;
+        sendAllSoundOff: () => void;
+        playNote: (note: number, channels: number[]) => void;
+        stopNote: (note: number, channels: number[]) => void;
+    }
 
-  interface HTMLOptGroupElement extends HTMLElement {
-    label: string;
-  }
+    interface HTMLOptGroupElement extends HTMLElement {
+        label: string;
+    }
 }
 
 // Global variables
@@ -78,7 +78,7 @@ const getData = new QueryData();
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("[DEBUG] Starting DOMContentLoaded initialization...");
-    
+
     // Initialize settings manager first
     window.settingsManager = new SettingsManager();
     settings = settingsManager.getSettings();
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const landingPage = document.getElementById("landing-page");
     const overlay = document.querySelector('.modal-overlay');
     const settingsButton = document.getElementById('settings-button');
-    
+
     if (landingPage) landingPage.style.display = "none";
     if (overlay) overlay.classList.remove('active');
     if (settingsButton) settingsButton.style.display = 'block';
@@ -179,11 +179,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize hex utilities with settings from preset
     console.log("[DEBUG] Initializing hex utilities...");
     initHexUtils(settings);
-    
+
     // Initialize display utilities
     console.log("[DEBUG] Initializing display utilities...");
     initDisplayUtils(settings);
-    
+
     // Initialize audio system - but don't try to start it yet
     console.log("[DEBUG] Creating audio context...");
     const ctx = await initAudio();
@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log("[DEBUG] Audio context resumed:", settings.audioContext.state);
                 await loadInstrumentSamples();
                 console.log("[DEBUG] Instrument samples loaded");
-                
+
                 // Remove the event listeners once audio is started
                 document.removeEventListener('click', startAudioHandler);
                 document.removeEventListener('keydown', startAudioHandler);
@@ -221,10 +221,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize event handlers
     console.log("[DEBUG] Initializing event handlers...");
     initEventHandlers(settings);
-    
+
     // Add settings button handler
     document.getElementById('settings-button')?.addEventListener('click', showSettings);
-    
+
     // Add click handler to close modal when clicking overlay
     document.querySelector('.modal-overlay')?.addEventListener('click', (event) => {
         if (event.target === event.currentTarget) {
@@ -308,59 +308,59 @@ window.updateColorSaturation = () => {
 window.updateKeyboardDisplay = () => settingsManager.updateKeyboardDisplay();
 
 function resizeHandler(): void {
-  settingsManager.updateDimensions();
-  settings = settingsManager.getSettings();
-  
-  // Clear and redraw
-  if (settings.canvas && settings.context) {
-    settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
-    drawGrid();
-  }
+    settingsManager.updateDimensions();
+    settings = settingsManager.getSettings();
+
+    // Clear and redraw
+    if (settings.canvas && settings.context) {
+        settings.context.clearRect(0, 0, settings.canvas.width, settings.canvas.height);
+        drawGrid();
+    }
 }
 
 function showSettings(): void {
-  const overlay = document.querySelector('.modal-overlay');
-  const landingPage = document.getElementById('landing-page');
-  const settingsButton = document.getElementById('settings-button');
-  
-  // Update notation system dropdown to match current settings
-  const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
-  if (notationSelect && settings.notationSystem) {
-    notationSelect.value = settings.notationSystem;
-    
-    // Also update the custom select display if it exists
-    const customSelect = document.querySelector('.custom-select') as HTMLElement;
-    if (customSelect) {
-      const selectedOption = Array.from(notationSelect.options)
-        .find(option => option.value === settings.notationSystem);
-      if (selectedOption) {
-        customSelect.innerHTML = `${selectedOption.text}`;
-      }
+    const overlay = document.querySelector('.modal-overlay');
+    const landingPage = document.getElementById('landing-page');
+    const settingsButton = document.getElementById('settings-button');
+
+    // Update notation system dropdown to match current settings
+    const notationSelect = document.getElementById('notation-system') as HTMLSelectElement;
+    if (notationSelect && settings.notationSystem) {
+        notationSelect.value = settings.notationSystem;
+
+        // Also update the custom select display if it exists
+        const customSelect = document.querySelector('.custom-select') as HTMLElement;
+        if (customSelect) {
+            const selectedOption = Array.from(notationSelect.options)
+                .find(option => option.value === settings.notationSystem);
+            if (selectedOption) {
+                customSelect.innerHTML = `${selectedOption.text}`;
+            }
+        }
     }
-  }
-  
-  if (overlay) overlay.classList.add('active');
-  if (landingPage) landingPage.style.display = 'block';
-  if (settingsButton) settingsButton.style.display = 'none';
-  
-  document.body.style.overflow = 'hidden';
+
+    if (overlay) overlay.classList.add('active');
+    if (landingPage) landingPage.style.display = 'block';
+    if (settingsButton) settingsButton.style.display = 'none';
+
+    document.body.style.overflow = 'hidden';
 }
 
 function hideSettings(): void {
-  const overlay = document.querySelector('.modal-overlay');
-  const landingPage = document.getElementById('landing-page');
-  const settingsButton = document.getElementById('settings-button');
-  
-  if (overlay) overlay.classList.remove('active');
-  if (landingPage) landingPage.style.display = 'none';
-  if (settingsButton) settingsButton.style.display = 'block';
-  
-  document.body.style.overflow = 'hidden';
+    const overlay = document.querySelector('.modal-overlay');
+    const landingPage = document.getElementById('landing-page');
+    const settingsButton = document.getElementById('settings-button');
+
+    if (overlay) overlay.classList.remove('active');
+    if (landingPage) landingPage.style.display = 'none';
+    if (settingsButton) settingsButton.style.display = 'block';
+
+    document.body.style.overflow = 'hidden';
 }
 
 // Modify the back function to use the new modal behavior
 function back(): void {
-  showSettings();
+    showSettings();
 }
 
 // Update goKeyboard to not try to start audio immediately
@@ -371,7 +371,7 @@ async function goKeyboard(): Promise<boolean> {
 
     // Hide settings and show keyboard
     hideSettings();
-    
+
     // Initialize canvas using SettingsManager
     settingsManager.initializeCanvas();
 
@@ -477,12 +477,12 @@ function updateChordNames(rootNote: string) {
 function populateLearningNoteDropdown() {
     const learningNoteRootSelect = document.getElementById('learning-note-root') as HTMLSelectElement;
     const namesTextarea = document.getElementById('names') as HTMLTextAreaElement;
-    
+
     if (!learningNoteRootSelect || !namesTextarea) return;
 
     // Clear existing options
     learningNoteRootSelect.innerHTML = '';
-    
+
     // Get note names from the current tuning system
     const noteNames = settings.names.map(replaceAccidentals);
     noteNames.forEach((name, index) => {
@@ -544,53 +544,31 @@ document.head.appendChild(style);
 // Function to set learning mode
 function setLearningMode(chordData: { symbol: string; spelling: string[] }) {
     console.log('[DEBUG] setLearningMode called with chordData:', chordData);
-    
+
     // Get the root note from the learning note root dropdown
     const learningNoteRootSelect = document.getElementById('learning-note-root') as HTMLSelectElement;
-    const selectedRootIndex = parseInt(learningNoteRootSelect.value);
-    const selectedRootNote = settings.names[selectedRootIndex];
-    
-    // Convert chord spelling to steps relative to C
-    const equivSteps = settings.enum ? settings.equivSteps : settings.scale.length;
-    
-    // Get the steps for each note in the chord spelling relative to C
-    const chordSteps = chordData.spelling.map(note => {
-        // Remove octave and convert to standard notation first
-        const standardNote = convertNoteNameToSystem(note.replace(/\d+$/, ''), 'Standard');
-        // Find the index of this note in the scale
-        const noteIndex = settings.names.findIndex(n => 
-            convertNoteNameToSystem(n, 'Standard') === standardNote
-        );
-        return noteIndex;
+    const selectedRootNote = settings.names[parseInt(learningNoteRootSelect.value)];
+
+    // Update settings with the selected chord
+    settings.learningChord = chordData.spelling.map(note => {
+        // Remove octave number from the pattern note
+        const patternNote = note.replace(/\d+$/, '');
+        // Get just the root note letter from the selected root
+        const selectedRoot = selectedRootNote.match(/[A-G]/)?.[0] || selectedRootNote[0];
+        // Replace the root note (C) in the pattern with our selected root and convert to current notation system
+        const transposedNote = patternNote.replace(/^C/, selectedRoot);
+        return convertNoteNameToSystem(transposedNote, settings.notationSystem) + '4';
     });
-    
-    // Calculate relative steps from root
-    const rootSteps = chordSteps.map(step => ((step - chordSteps[0] + equivSteps) % equivSteps));
-    
-    // Now transpose these steps to the selected root
-    settings.learningChord = rootSteps.map(step => {
-        // Calculate the actual note index in the scale
-        const noteIndex = (selectedRootIndex + step) % equivSteps;
-        // Get the note name and convert to the current notation system
-        return convertNoteNameToSystem(settings.names[noteIndex], settings.notationSystem) + '4';
-    });
-    
-    // Update the chord symbol with the new root note
-    settings.learningChordSymbol = chordData.symbol.replace(/^[A-G][b#♯♭]*/, selectedRootNote);
-    
-    console.log('[DEBUG] Chord transposition:', {
-        originalSpelling: chordData.spelling,
-        chordSteps,
-        rootSteps,
-        selectedRootIndex,
-        transposedChord: settings.learningChord,
-        symbol: settings.learningChordSymbol
-    });
-    
+    settings.learningChordSymbol = chordData.symbol.replace(/^[A-G]/, selectedRootNote[0]);
+
+    console.log('[DEBUG] Updated settings.learningChord:', settings.learningChord);
+    console.log('[DEBUG] Updated settings.learningChordSymbol:', settings.learningChordSymbol);
+
     // Update URL with learningChord symbol
     const url = new URL(window.location.href);
     url.searchParams.set('learningChord', encodeURIComponent(settings.learningChordSymbol));
     window.history.replaceState({}, '', url.toString());
+    console.log('[DEBUG] Updated URL with learningChord:', url.toString());
 
     // Update UI to reflect selected chord
     const chordList = document.getElementById('chord-list');
@@ -611,12 +589,12 @@ function setLearningMode(chordData: { symbol: string; spelling: string[] }) {
 function clearLearningMode() {
     settings.learningChord = [];
     settings.learningChordSymbol = '';
-    
+
     // Remove from URL
     const url = new URL(window.location.href);
     url.searchParams.delete('learningChord');
     window.history.replaceState({}, '', url.toString());
-    
+
     // Clear UI selection
     const chordList = document.getElementById('chord-list');
     if (chordList) {
@@ -624,7 +602,7 @@ function clearLearningMode() {
             li.classList.remove('selected');
         });
     }
-    
+
     // Force a redraw
     drawGrid();
 }

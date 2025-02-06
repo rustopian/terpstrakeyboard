@@ -192,6 +192,17 @@
 								<input id="toggle_mode" type="checkbox" name="toggle_mode" value="fnord" onchange="changeURL();noPreset();">
 								<span class="label-body">Toggle Mode (Click/tap to hold notes)</span>
 							</label>
+							
+							<div class="control-group">
+								<label>
+									<input id="tilt_volume_enabled" type="checkbox" name="tilt_volume_enabled" value="fnord" onchange="window.settingsManager.updateTiltVolume();">
+									<span class="label-body">Enable Tilt Volume Control</span>
+								</label>
+								<select id="tilt_volume_axis" class="u-full-width" onchange="window.settingsManager.updateTiltVolume();" style="margin-top: 10px;">
+									<option value="x">Front-to-Back Tilt (X-axis)</option>
+									<option value="z">Left-to-Right Tilt (Z-axis)</option>
+								</select>
+							</div>
 						</div>
 					</div>
 				</div>
