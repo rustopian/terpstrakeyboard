@@ -5,6 +5,13 @@ import { centsToColor, drawHex } from '../grid/displayUtils';
 import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote, activateNote, deactivateNote, isNoteActive, releaseAllNotes } from '../audio/activeHex';
 import type { EventHandlerSettings } from '../settings/SettingsTypes';
 import { hasEventHandlerProps } from '../settings/SettingsTypes';
+import type { SettingsManager } from '../settings/SettingsManager';
+
+declare global {
+  interface Window {
+    settingsManager: SettingsManager;
+  }
+}
 
 // Extend ActiveHex type to include touchId
 interface TouchActiveHex extends ActiveHex {
@@ -42,6 +49,11 @@ let state: KeyboardState = {
   isSustainOn: false
 };
 let is_key_event_added: number | undefined;
+
+// Add state tracking for tilt animation
+let tiltAnimationFrame: number | null = null;
+let currentTiltAngle = 45; // Start at maximum volume position
+const TILT_SPEED = 400; // Degrees per second
 
 /**
  * Initializes all event handlers for the keyboard application.
@@ -155,6 +167,77 @@ function setupKeyboardEvents(): void {
   }
 }
 
+// Add tilt volume control function
+function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
+  if (!settings?.audioContext) {
+    console.log('[DEBUG] No audio context available for tilt volume control');
+    return;
+  }
+
+  if (!window.settingsManager) {
+    console.log('[DEBUG] Settings manager not available for tilt volume control');
+    return;
+  }
+
+  // Left Shift = front-to-back tilt (x-axis)
+  // Left Ctrl = left-to-right tilt (z-axis)
+  const isXAxis = keyCode === 16; // Shift key
+  const isZAxis = keyCode === 17; // Ctrl key
+
+  // Only process if the key matches our tilt controls
+  if (!isXAxis && !isZAxis) {
+    console.log('[DEBUG] Invalid key for tilt control:', keyCode);
+    return;
+  }
+
+  // Cancel any existing animation
+  if (tiltAnimationFrame !== null) {
+    cancelAnimationFrame(tiltAnimationFrame);
+    tiltAnimationFrame = null;
+  }
+
+  // Target angle based on key state
+  const targetAngle = isKeyDown ? -45 : 45;
+  let lastTime = performance.now();
+
+  // Animate the tilt
+  function animateTilt(currentTime: number) {
+    const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+    lastTime = currentTime;
+
+    // Calculate how much to change the angle this frame
+    const maxDelta = TILT_SPEED * deltaTime;
+    const angleDiff = targetAngle - currentTiltAngle;
+    const delta = Math.min(Math.abs(angleDiff), maxDelta) * Math.sign(angleDiff);
+
+    // Update the current angle
+    currentTiltAngle += delta;
+
+    // Map current angle to volume using same function as device tilt
+    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -45, 45);
+    
+    // Update settings
+    settings.tiltVolumeEnabled = true;
+    settings.tiltVolumeAxis = isXAxis ? 'x' : 'z';
+    settings.tiltVolume = volume;
+
+    // Update all active note volumes
+    window.settingsManager.updateAllActiveNoteVolumes();
+
+    console.log(`[DEBUG] Tilt animation: angle=${currentTiltAngle.toFixed(2)}, volume=${volume.toFixed(2)}`);
+
+    // Continue animation if we haven't reached the target
+    if (Math.abs(targetAngle - currentTiltAngle) > 0.01) {
+      tiltAnimationFrame = requestAnimationFrame(animateTilt);
+    } else {
+      tiltAnimationFrame = null;
+    }
+  }
+
+  // Start the animation
+  tiltAnimationFrame = requestAnimationFrame(animateTilt);
+}
+
 /**
  * Handles keyboard key press events.
  * In non-toggle mode:
@@ -167,6 +250,12 @@ function setupKeyboardEvents(): void {
 function onKeyDown(e: KeyboardEvent): void {
   if (!settings) return;
   
+  // Handle tilt volume control keys
+  if (e.keyCode === 16 || e.keyCode === 17) { // Shift or Ctrl
+    handleTiltVolume(e.keyCode, true);
+    return;
+  }
+
   if (e.keyCode === 32) { // Spacebar
     state.isSustainOn = true;
   } else if (!state.isMouseDown && !state.isTouchDown
@@ -199,6 +288,12 @@ function onKeyDown(e: KeyboardEvent): void {
 function onKeyUp(e: KeyboardEvent): void {
   if (!settings) return;
   
+  // Handle tilt volume control keys
+  if (e.keyCode === 16 || e.keyCode === 17) { // Shift or Ctrl
+    handleTiltVolume(e.keyCode, false);
+    return;
+  }
+
   if (e.keyCode === 32) { // Spacebar
     state.isSustainOn = false;
     if (state.sustainedNotes.length > 0) {

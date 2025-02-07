@@ -18,6 +18,7 @@ import {
     hasDisplayProps,
     hasGridProps
 } from './SettingsTypes';
+import { audioNodeManager } from '../audio/AudioNodeManager';
 
 /**
  * Structure for a preset configuration
@@ -132,12 +133,12 @@ export class SettingsManager {
         }
     }
 
-    private mapTiltToVolume(angle: number, minAngle: number, maxAngle: number): number {
+    public mapTiltToVolume(angle: number, minAngle: number, maxAngle: number): number {
         const clamped = Math.max(minAngle, Math.min(maxAngle, angle));
         return (clamped - minAngle) / (maxAngle - minAngle);
     }
 
-    private updateAllActiveNoteVolumes(): void {
+    public updateAllActiveNoteVolumes(): void {
         if (!this.settings.audioContext) return;
 
         const baseGain = 0.3; // Match the initial gain from audioHandler
@@ -146,17 +147,20 @@ export class SettingsManager {
 
         // Update volume for all active notes
         for (const hex of this.settings.activeHexObjects) {
-            if (hex.nodeId && this.settings.activeSources[hex.nodeId as any]) {
-                const gainNode = this.settings.activeSources[hex.nodeId as any].gainNode;
-                const targetGain = baseGain * this.settings.tiltVolume;
+            if (hex.nodeId) {
+                const nodePair = audioNodeManager.getNode(hex.nodeId);
+                if (nodePair) {
+                    const gainNode = nodePair.gainNode;
+                    const targetGain = baseGain * this.settings.tiltVolume;
 
-                // Instead of canceling, schedule from the current value
-                const currentGain = gainNode.gain.value;
-                gainNode.gain.setValueAtTime(currentGain, currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(
-                    Math.max(0.0001, targetGain), // Prevent zero value for exponential ramp
-                    currentTime + rampTime
-                );
+                    // Instead of canceling, schedule from the current value
+                    const currentGain = gainNode.gain.value;
+                    gainNode.gain.setValueAtTime(currentGain, currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(
+                        Math.max(0.0001, targetGain), // Prevent zero value for exponential ramp
+                        currentTime + rampTime
+                    );
+                }
             }
         }
     }

@@ -105,6 +105,9 @@ export interface EventHandlerRequired {
   sustainedNotes: ActiveHex[];
   sustain: boolean;
   fadeoutTime: number;
+  tiltVolumeEnabled: boolean;
+  tiltVolumeAxis: string;
+  tiltVolume: number;
 }
 
 /**

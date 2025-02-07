@@ -4,6 +4,13 @@ import { sampleManager } from './SampleManager';
 import { hexCoordsToCents } from '../grid/hexUtils';
 import { drawHex } from '../grid/displayUtils';
 import { centsToColor } from '../grid/displayUtils';
+import type { Settings } from '../settings/Settings';
+
+declare global {
+  interface Window {
+    settings: Settings;
+  }
+}
 
 export interface NoteEvent {
   type: 'noteOn' | 'noteOff';
@@ -116,7 +123,10 @@ export class NoteEventManager {
     source.playbackRate.value = frequency / sampleBaseFreq;
     
     const gainNode = this.audioContext.createGain();
-    gainNode.gain.value = 0.3; // Initial gain
+    const settings = window.settings;
+    const baseGain = 0.3; // Initial gain
+    const tiltVolume = settings?.tiltVolumeEnabled ? settings.tiltVolume : 1.0;
+    gainNode.gain.value = baseGain * tiltVolume; // Apply tilt volume if enabled
     
     source.connect(gainNode);
     gainNode.connect(this.audioContext.destination);

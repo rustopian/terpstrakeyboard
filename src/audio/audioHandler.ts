@@ -60,48 +60,6 @@ export function initAudio(): AudioContext | null {
   }
 }
 
-export function playNote(freq: number): { source: AudioBufferSourceNode; gainNode: GainNode } | null {
-  if (!settings.audioContext) {
-    console.error("[DEBUG] No audio context available for playback");
-    return null;
-  }
-
-  const buffer = sampleManager.getBuffer(freq);
-  if (!buffer) {
-    console.error("[DEBUG] No sample buffer available for frequency:", freq);
-    return null;
-  }
-
-  const source = settings.audioContext.createBufferSource();
-  source.buffer = buffer;
-  
-  // Calculate playback rate
-  const baseFreq = getBaseFrequency(buffer.sampleRate);
-  const playbackRate = freq / baseFreq;
-  source.playbackRate.value = playbackRate;
-  
-  console.log(`[DEBUG] Audio playback:
-    frequency=${freq.toFixed(2)}Hz
-    baseFreq=${baseFreq}Hz
-    playbackRate=${playbackRate.toFixed(3)}`);
-  
-  const gainNode = settings.audioContext.createGain();
-  source.connect(gainNode);
-  gainNode.connect(settings.audioContext.destination);
-  
-  // Start with zero gain and ramp up for click-free start
-  const currentTime = settings.audioContext.currentTime;
-  gainNode.gain.setValueAtTime(0, currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.3, currentTime + 0.01);
-  
-  source.start(0);
-  
-  // Register with audio node manager
-  audioNodeManager.add(gainNode, source, freq);
-  
-  return { source, gainNode };
-}
-
 export function stopNote(gainNode: GainNode | null, source: AudioBufferSourceNode | null): void {
   if (!settings?.audioContext || settings.sustain) return;
   
