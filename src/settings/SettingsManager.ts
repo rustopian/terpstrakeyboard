@@ -124,7 +124,7 @@ export class SettingsManager {
                     this.settings.tiltVolume = volume;
                     window.settings.tiltVolume = volume; // Ensure window.settings is in sync
                     this.updateActiveNoteGains();
-                    console.log(`[DEBUG] Tilt volume updated: ${volume.toFixed(3)} (${axis}-axis angle: ${angle.toFixed(1)}°)`);
+                    console.log(`[DEBUG] Tilt volume updated: ${volume.toFixed(3)} (${axis}-axis angle: ${angle.toFixed(1)}°, zero: ${this.settings.tiltZeroPoint.toFixed(1)}°)`);
                 }
             }
         };
@@ -142,8 +142,31 @@ export class SettingsManager {
     }
 
     public mapTiltToVolume(angle: number, minAngle: number, maxAngle: number): number {
-        const clamped = Math.max(minAngle, Math.min(maxAngle, angle));
-        return (clamped - minAngle) / (maxAngle - minAngle);
+        // Adjust angle relative to calibrated zero point
+        const adjustedAngle = angle - this.settings.tiltZeroPoint;
+        
+        // Clamp the adjusted angle to our range
+        const clamped = Math.max(minAngle, Math.min(maxAngle, adjustedAngle));
+        
+        // For keyboard control, we want a simpler linear mapping:
+        // maxAngle -> 0.95 (95% volume)
+        // 0 -> 0.5 (50% volume)
+        // minAngle -> 0.05 (5% volume)
+        
+        // Normalize the angle to 0-1 range
+        const normalizedAngle = (clamped - minAngle) / (maxAngle - minAngle);
+        
+        // Map to volume range (0.05 to 0.95)
+        return 0.05 + normalizedAngle * 0.9;
+    }
+
+    public calibrateTiltZero(currentAngle: number): void {
+        console.log(`[DEBUG] Calibrating tilt zero point to ${currentAngle.toFixed(1)}°`);
+        this.settings.tiltZeroPoint = currentAngle;
+        window.settings.tiltZeroPoint = currentAngle;
+        
+        // Update gains immediately to reflect the new calibration
+        this.updateActiveNoteGains();
     }
 
     public updateActiveNoteGains(): void {
@@ -1449,5 +1472,34 @@ export class SettingsManager {
             notationSelect.value = this.settings.notationSystem;
             notationSelect.addEventListener('change', () => this.updateNotationSystem());
         }
+    }
+
+    public calibrateTiltFromSensor(): void {
+        if (!window.DeviceOrientationEvent) {
+            console.warn('[DEBUG] Device orientation not supported');
+            return;
+        }
+
+        // Get a single reading from the sensor
+        const handleCalibration = (event: DeviceOrientationEvent) => {
+            const axis = this.settings.tiltVolumeAxis;
+            let angle: number | null = null;
+
+            if (axis === 'x' && event.beta !== null) {
+                angle = event.beta;
+            } else if (axis === 'z' && event.gamma !== null) {
+                angle = event.gamma;
+            }
+
+            if (angle !== null) {
+                this.calibrateTiltZero(angle);
+            }
+
+            // Remove this one-time listener
+            window.removeEventListener('deviceorientation', handleCalibration);
+        };
+
+        // Add one-time listener for calibration
+        window.addEventListener('deviceorientation', handleCalibration, { once: true });
     }
 } 

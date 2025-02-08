@@ -254,12 +254,18 @@ export class NoteEventManager {
           // Cancel any scheduled values
           gainNode.gain.cancelScheduledValues(currentTime);
           
-          // Set current gain and ramp to new target gain
+          // Set current gain
           gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(
-            Math.max(0.0001, targetGain), // Ensure we never go to zero for exponential ramp
-            currentTime + 0.01 // Even shorter ramp time for more responsive tilt
-          );
+          
+          // Use linear ramp for zero or near-zero values, exponential otherwise
+          if (targetGain <= 0.001) {
+            gainNode.gain.linearRampToValueAtTime(0, currentTime + 0.01);
+          } else {
+            gainNode.gain.exponentialRampToValueAtTime(
+              targetGain,
+              currentTime + 0.01
+            );
+          }
         }
       }
     }

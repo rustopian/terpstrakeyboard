@@ -61,6 +61,7 @@ export interface Settings {
   tiltVolumeEnabled: boolean;
   tiltVolumeAxis: 'x' | 'z';  // 'x' for front-to-back, 'z' for left-to-right
   tiltVolume: number;  // Current volume multiplier from tilt [0-1]
+  tiltZeroPoint: number;  // Calibrated "zero" point for tilt (in degrees)
   instrumentFade: number;
 }
 
@@ -123,5 +124,6 @@ export const defaultSettings: Settings = {
   tiltVolumeEnabled: false,
   tiltVolumeAxis: 'x',
   tiltVolume: 1.0,
+  tiltZeroPoint: 0,  // Default zero point is 0 degrees
   instrumentFade: 0.3
 };

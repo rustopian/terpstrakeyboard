@@ -52,8 +52,8 @@ let is_key_event_added: number | undefined;
 
 // Add state tracking for tilt animation
 let tiltAnimationFrame: number | null = null;
-let currentTiltAngle = 45; // Start at maximum volume position
-const TILT_SPEED = 400; // Degrees per second
+let currentTiltAngle = 0; // Start at neutral position (50% volume)
+const TILT_SPEED = 60; // Degrees per second - reduced from 400 for more gradual changes
 
 /**
  * Initializes all event handlers for the keyboard application.
@@ -169,23 +169,11 @@ function setupKeyboardEvents(): void {
 
 // Add tilt volume control function
 function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
-  if (!settings?.audioContext) {
-    console.log('[DEBUG] No audio context available for tilt volume control');
-    return;
-  }
-
-  if (!window.settingsManager) {
-    console.log('[DEBUG] Settings manager not available for tilt volume control');
-    return;
-  }
-
-  // Left Shift = front-to-back tilt (x-axis)
-  // Left Ctrl = left-to-right tilt (z-axis)
-  const isXAxis = keyCode === 16; // Shift key
-  const isZAxis = keyCode === 17; // Ctrl key
-
+  const isShift = keyCode === 16;
+  const isCtrl = keyCode === 17;
+  
   // Only process if the key matches our tilt controls
-  if (!isXAxis && !isZAxis) {
+  if (!isShift && !isCtrl) {
     console.log('[DEBUG] Invalid key for tilt control:', keyCode);
     return;
   }
@@ -197,7 +185,10 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
   }
 
   // Target angle based on key state
-  const targetAngle = isKeyDown ? -45 : 45;
+  const targetAngle: number = isKeyDown 
+    ? (isShift ? 30 : (isCtrl ? -30 : 0))  // 30° for Shift (95% volume), -30° for Ctrl (0% volume)
+    : 0;  // Return to center (50% volume) on key release
+  
   let lastTime = performance.now();
 
   // Animate the tilt
@@ -214,30 +205,26 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     currentTiltAngle += delta;
 
     // Map current angle to volume using same function as device tilt
-    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -45, 45);
+    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -30, 30);
     
     // Update both settings objects
     settings.tiltVolumeEnabled = true;
-    settings.tiltVolumeAxis = isXAxis ? 'x' : 'z';
+    settings.tiltVolumeAxis = 'x';  // Always use x-axis for keyboard tilt
     settings.tiltVolume = volume;
 
     // Ensure window.settings is updated
     window.settings.tiltVolumeEnabled = true;
-    window.settings.tiltVolumeAxis = isXAxis ? 'x' : 'z';
+    window.settings.tiltVolumeAxis = 'x';
     window.settings.tiltVolume = volume;
 
-    console.log(`[DEBUG] Tilt animation: angle=${currentTiltAngle.toFixed(2)}, volume=${volume.toFixed(2)}, settings.tiltVolume=${settings.tiltVolume.toFixed(2)}, window.settings.tiltVolume=${window.settings.tiltVolume.toFixed(2)}`);
-
-    // Update all active note volumes using the consolidated method
-    window.settingsManager.updateActiveNoteGains();
+    // Update all active note gains
+    window.noteEventManager.updateAllGains();
 
     // Continue animation if we haven't reached the target
-    if (Math.abs(targetAngle - currentTiltAngle) > 0.01) {
+    if (Math.abs(angleDiff) > 0.01) {
       tiltAnimationFrame = requestAnimationFrame(animateTilt);
     } else {
       tiltAnimationFrame = null;
-      // Ensure final volume is set correctly
-      window.settingsManager.updateActiveNoteGains();
     }
   }
 

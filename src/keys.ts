@@ -77,14 +77,14 @@ const getData = new QueryData();
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("[DEBUG] Starting DOMContentLoaded initialization...");
+    // console.log("[DEBUG] Starting DOMContentLoaded initialization...");
 
     // Initialize settings manager first
     window.settingsManager = new SettingsManager();
     settings = settingsManager.getSettings();
 
     // Hide settings dialog and landing page immediately
-    console.log("[DEBUG] Hiding settings dialog and landing page...");
+    // console.log("[DEBUG] Hiding settings dialog and landing page...");
     const landingPage = document.getElementById("landing-page");
     const overlay = document.querySelector('.modal-overlay');
     const settingsButton = document.getElementById('settings-button');
@@ -102,23 +102,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         const notationSystem = urlParams.get('notationSystem') || 'Standard';
         notationSelect.value = notationSystem;
         settings.notationSystem = notationSystem;
-        console.log("[DEBUG] Initial notation system:", notationSystem);
+        // console.log("[DEBUG] Initial notation system:", notationSystem);
     }
 
     // Show keyboard element immediately
-    console.log("[DEBUG] Showing keyboard element...");
+    // console.log("[DEBUG] Showing keyboard element...");
     const keyboard = document.getElementById("keyboard");
     if (keyboard) {
         keyboard.style.display = "block";
         keyboard.style.visibility = "visible";
         keyboard.style.opacity = "1";
-        console.log("[DEBUG] Keyboard element shown");
+        // console.log("[DEBUG] Keyboard element shown");
     } else {
         console.error("[DEBUG] Could not find keyboard element!");
     }
 
     // Initialize canvas and context first
-    console.log("[DEBUG] Initializing canvas...");
+    // console.log("[DEBUG] Initializing canvas...");
     try {
         settingsManager.initializeCanvas();
         settings = settingsManager.getSettings();
@@ -127,32 +127,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Load presets BEFORE initializing hex utils and display utils
-    console.log("[DEBUG] Loading presets...");
+    // console.log("[DEBUG] Loading presets...");
     try {
         await settingsManager.loadPresets();
-        console.log("[DEBUG] Presets loaded successfully");
+        // console.log("[DEBUG] Presets loaded successfully");
     } catch (error) {
         console.error("[DEBUG] Error loading presets:", error);
         // Don't show settings on error, just log it
     }
 
     // Apply URL parameters or default preset
-    console.log("[DEBUG] Applying settings from URL or default preset...");
+    // console.log("[DEBUG] Applying settings from URL or default preset...");
     if (window.location.search) {
-        console.log("[DEBUG] URL parameters found, applying preset...");
+        // console.log("[DEBUG] URL parameters found, applying preset...");
         // Apply preset from URL parameters
         const presetId = getData.preset ? parseInt(getData.preset) : 16;  // Default to 16 if not specified
-        console.log("[DEBUG] Using preset ID:", presetId);
+        // console.log("[DEBUG] Using preset ID:", presetId);
         try {
             settingsManager.checkPreset(presetId);
             settings = settingsManager.getSettings();
-            console.log("[DEBUG] Settings updated from preset");
+            // console.log("[DEBUG] Settings updated from preset");
         } catch (error) {
             console.error("[DEBUG] Error applying preset:", error);
             // Don't show settings on error, just log it
         }
     } else {
-        console.log("[DEBUG] No URL parameters, loading default preset...");
+        // console.log("[DEBUG] No URL parameters, loading default preset...");
         // No URL parameters, load default preset
         const mselect = document.getElementById('quicklinks') as HTMLSelectElement;
         if (mselect) {
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         const parameters = JSON.parse(mselect.value);
                         settingsManager.updateFromPreset(parameters);
                         settings = settingsManager.getSettings();
-                        console.log("[DEBUG] Default preset applied successfully");
+                        // console.log("[DEBUG] Default preset applied successfully");
                     } catch (error) {
                         console.error("[DEBUG] Error applying default preset:", error);
                         // Don't show settings on error, just log it
@@ -177,31 +177,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Initialize hex utilities with settings from preset
-    console.log("[DEBUG] Initializing hex utilities...");
+    // console.log("[DEBUG] Initializing hex utilities...");
     initHexUtils(settings);
 
     // Initialize display utilities
-    console.log("[DEBUG] Initializing display utilities...");
+    // console.log("[DEBUG] Initializing display utilities...");
     initDisplayUtils(settings);
 
     // Initialize audio system - but don't try to start it yet
-    console.log("[DEBUG] Creating audio context...");
+    // console.log("[DEBUG] Creating audio context...");
     const ctx = await initAudio();
     if (ctx) {
         settings.audioContext = ctx;
-        console.log("[DEBUG] Audio context created in suspended state:", ctx.state);
+        // console.log("[DEBUG] Audio context created in suspended state:", ctx.state);
     }
 
     // Add user interaction handler to start audio
-    console.log("[DEBUG] Setting up user interaction handler for audio...");
+    // console.log("[DEBUG] Setting up user interaction handler for audio...");
     const startAudioHandler = async () => {
-        console.log("[DEBUG] User interaction detected, starting audio...");
+        // console.log("[DEBUG] User interaction detected, starting audio...");
         if (settings.audioContext && settings.audioContext.state === 'suspended') {
             try {
                 await settings.audioContext.resume();
-                console.log("[DEBUG] Audio context resumed:", settings.audioContext.state);
+                // console.log("[DEBUG] Audio context resumed:", settings.audioContext.state);
                 await loadInstrumentSamples();
-                console.log("[DEBUG] Instrument samples loaded");
+                // console.log("[DEBUG] Instrument samples loaded");
 
                 // Remove the event listeners once audio is started
                 document.removeEventListener('click', startAudioHandler);
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('touchstart', startAudioHandler);
 
     // Initialize event handlers
-    console.log("[DEBUG] Initializing event handlers...");
+    // console.log("[DEBUG] Initializing event handlers...");
     initEventHandlers(settings);
 
     // Add settings button handler
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Initialize scroll area
-    console.log("[DEBUG] Initializing scroll area...");
+    // console.log("[DEBUG] Initializing scroll area...");
     initScrollArea();
 
     // Add form submission handler
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('[DEBUG] learning-note-root element not found');
     }
 
-    console.log("[DEBUG] All setup complete, calling goKeyboard...");
+    // console.log("[DEBUG] All setup complete, calling goKeyboard...");
     goKeyboard();
 });
 // Add scroll area functionality with edge detection

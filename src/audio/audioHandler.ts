@@ -51,7 +51,7 @@ export function initAudio(): AudioContext | null {
 
     const ctx = new AudioContextConstructor();
     if (ctx.state === 'suspended') {
-      console.log("[DEBUG] AudioContext created in suspended state - waiting for user interaction");
+      // console.log("[DEBUG] AudioContext created in suspended state - waiting for user interaction");
     }
     return ctx;
   } catch (e) {
