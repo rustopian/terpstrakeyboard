@@ -324,20 +324,24 @@ select#quicklinks {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
+  right: 0;
   height: 50px;
-  background-color: rgba(0, 0, 0, 0.2);
-  z-index: 999;
-  cursor: ew-resize;
-  touch-action: none;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  pointer-events: auto;
+  background-color: #4a90e2;  /* Default blue color */
+  transition: background-color 0.3s ease;
+  z-index: 1;
+}
+
+/* Add these classes for different volume levels */
+.scroll-area.volume-low {
+  background-color: #4a90e2;  /* Blue for soft */
+}
+
+.scroll-area.volume-medium {
+  background-color: #f39c12;  /* Orange-yellow for medium */
+}
+
+.scroll-area.volume-high {
+  background-color: #e67e22;  /* Orange for loud */
 }
 
 .scroll-area::before {

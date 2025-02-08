@@ -186,7 +186,7 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
 
   // Target angle based on key state
   const targetAngle: number = isKeyDown 
-    ? (isShift ? 30 : (isCtrl ? -30 : 0))  // 30° for Shift (95% volume), -30° for Ctrl (0% volume)
+    ? (isShift ? 90 : (isCtrl ? -90 : 0))  // 90° for Shift (95% volume), -90° for Ctrl (0% volume)
     : 0;  // Return to center (50% volume) on key release
   
   let lastTime = performance.now();
@@ -205,7 +205,7 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     currentTiltAngle += delta;
 
     // Map current angle to volume using same function as device tilt
-    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -30, 30);
+    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -90, 90);
     
     // Update both settings objects
     settings.tiltVolumeEnabled = true;
@@ -216,6 +216,27 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     window.settings.tiltVolumeEnabled = true;
     window.settings.tiltVolumeAxis = 'x';
     window.settings.tiltVolume = volume;
+
+    // Update scroll area color based on volume
+    const scrollArea = document.querySelector('.scroll-area') as HTMLElement;
+    if (scrollArea) {
+      scrollArea.classList.remove('volume-low', 'volume-medium', 'volume-high');
+      if (volume < 0.33) {
+        scrollArea.classList.add('volume-low');
+      } else if (volume < 0.66) {
+        scrollArea.classList.add('volume-medium');
+      } else {
+        scrollArea.classList.add('volume-high');
+      }
+      
+      // Calculate interpolated color
+      const startColor = { r: 74, g: 144, b: 226 };  // #4a90e2 (blue)
+      const endColor = { r: 230, g: 126, b: 34 };   // #e67e22 (orange)
+      const r = Math.round(startColor.r + (endColor.r - startColor.r) * volume);
+      const g = Math.round(startColor.g + (endColor.g - startColor.g) * volume);
+      const b = Math.round(startColor.b + (endColor.b - startColor.b) * volume);
+      scrollArea.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    }
 
     // Update all active note gains
     window.noteEventManager.updateAllGains();
