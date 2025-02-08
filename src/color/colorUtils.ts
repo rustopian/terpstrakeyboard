@@ -205,4 +205,35 @@ export function adjustColorSaturation(hexColor: string, saturationFactor: number
   
   // Convert RGB to hex
   return rgbToHex(rgbResult.red, rgbResult.green, rgbResult.blue);
+}
+
+export interface RGBColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export function getTiltVolumeColor(volume: number): string {
+  // Define colors for a more pleasing gradient path
+  const startColor: RGBColor = { r: 74, g: 144, b: 226 };  // #4a90e2 (blue)
+  const midColor: RGBColor = { r: 82, g: 183, b: 136 };    // #52b788 (bluish-green)
+  const endColor: RGBColor = { r: 247, g: 174, b: 71 };    // #f7ae47 (yellowish-orange)
+
+  // Interpolate through midColor for a more pleasing gradient
+  let r, g, b;
+  if (volume < 0.5) {
+    // First half: interpolate from blue to bluish-green
+    const t = volume * 2;  // normalize to 0-1 for first half
+    r = Math.round(startColor.r + (midColor.r - startColor.r) * t);
+    g = Math.round(startColor.g + (midColor.g - startColor.g) * t);
+    b = Math.round(startColor.b + (midColor.b - startColor.b) * t);
+  } else {
+    // Second half: interpolate from bluish-green to yellowish-orange
+    const t = (volume - 0.5) * 2;  // normalize to 0-1 for second half
+    r = Math.round(midColor.r + (endColor.r - midColor.r) * t);
+    g = Math.round(midColor.g + (endColor.g - midColor.g) * t);
+    b = Math.round(midColor.b + (endColor.b - midColor.b) * t);
+  }
+
+  return `rgb(${r}, ${g}, ${b})`;
 } 

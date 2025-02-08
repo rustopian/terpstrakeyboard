@@ -6,6 +6,7 @@ import { ActiveHex, initActiveHex, addActiveNote, removeActiveNote, activateNote
 import type { EventHandlerSettings } from '../settings/SettingsTypes';
 import { hasEventHandlerProps } from '../settings/SettingsTypes';
 import type { SettingsManager } from '../settings/SettingsManager';
+import { getTiltVolumeColor } from '../color/colorUtils';
 
 declare global {
   interface Window {
@@ -186,7 +187,7 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
 
   // Target angle based on key state
   const targetAngle: number = isKeyDown 
-    ? (isShift ? 45 : (isCtrl ? -45 : 0))  // 90° for Shift (95% volume), -90° for Ctrl (0% volume)
+    ? (isShift ? 20 : (isCtrl ? -20 : 0))  // 12° for Shift (95% volume), -12° for Ctrl (0% volume)
     : 0;  // Return to center (50% volume) on key release
   
   let lastTime = performance.now();
@@ -205,7 +206,7 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     currentTiltAngle += delta;
 
     // Map current angle to volume using same function as device tilt
-    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -90, 90);
+    const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -20, 20);
     
     // Update both settings objects
     settings.tiltVolumeEnabled = true;
@@ -229,13 +230,7 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
         scrollArea.classList.add('volume-high');
       }
       
-      // Calculate interpolated color
-      const startColor = { r: 74, g: 144, b: 226 };  // #4a90e2 (blue)
-      const endColor = { r: 230, g: 126, b: 34 };   // #e67e22 (orange)
-      const r = Math.round(startColor.r + (endColor.r - startColor.r) * volume);
-      const g = Math.round(startColor.g + (endColor.g - startColor.g) * volume);
-      const b = Math.round(startColor.b + (endColor.b - startColor.b) * volume);
-      scrollArea.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+      scrollArea.style.backgroundColor = getTiltVolumeColor(volume);
     }
 
     // Update all active note gains

@@ -2,7 +2,7 @@ import { Point } from '../core/geometry';
 import { calculateRotationMatrix } from '../core/geometry';
 import type { ColorVisionType } from '../color/colorTransform';
 import { transformColorsForCVD, transformColorForCVD } from '../color/colorTransform';
-import { hex2rgb, adjustColorSaturation } from '../color/colorUtils';
+import { hex2rgb, adjustColorSaturation, getTiltVolumeColor } from '../color/colorUtils';
 import { drawGrid } from '../grid/displayUtils';
 import { defaultSettings } from './Settings';
 import type { Settings } from './Settings';
@@ -125,8 +125,8 @@ export class SettingsManager {
 
             if (angle !== null) {
                 // Map angle to volume based on axis
-                const minAngle = axis === 'x' ? -90 : -90;
-                const maxAngle = axis === 'x' ? 90 : 90;
+                const minAngle = axis === 'x' ? -20 : -20;
+                const maxAngle = axis === 'x' ? 20 : 20;
                 const volume = this.mapTiltToVolume(angle, minAngle, maxAngle);
                 
                 // Only update if volume has changed significantly
@@ -137,27 +137,7 @@ export class SettingsManager {
                     // Update scroll area color
                     const scrollArea = document.querySelector('.scroll-area') as HTMLElement;
                     if (scrollArea) {
-                        // Define colors for a more pleasing gradient path
-                        const startColor = { r: 74, g: 144, b: 226 };  // #4a90e2 (blue)
-                        const midColor = { r: 82, g: 183, b: 136 };    // #52b788 (bluish-green)
-                        const endColor = { r: 247, g: 174, b: 71 };    // #f7ae47 (yellowish-orange)
-
-                        // Interpolate through midColor for a more pleasing gradient
-                        let r, g, b;
-                        if (volume < 0.5) {
-                            // First half: interpolate from blue to bluish-green
-                            const t = volume * 2;  // normalize to 0-1 for first half
-                            r = Math.round(startColor.r + (midColor.r - startColor.r) * t);
-                            g = Math.round(startColor.g + (midColor.g - startColor.g) * t);
-                            b = Math.round(startColor.b + (midColor.b - startColor.b) * t);
-                        } else {
-                            // Second half: interpolate from bluish-green to yellowish-orange
-                            const t = (volume - 0.5) * 2;  // normalize to 0-1 for second half
-                            r = Math.round(midColor.r + (endColor.r - midColor.r) * t);
-                            g = Math.round(midColor.g + (endColor.g - midColor.g) * t);
-                            b = Math.round(midColor.b + (endColor.b - midColor.b) * t);
-                        }
-                        scrollArea.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                        scrollArea.style.backgroundColor = getTiltVolumeColor(volume);
                     }
                     
                     // Use requestAnimationFrame for smoother updates
