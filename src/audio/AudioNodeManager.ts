@@ -26,6 +26,7 @@ export class AudioNodeManager {
       startTime: performance.now(),
       frequency
     });
+    console.log(`[DEBUG] Added audio node ${id} for frequency ${frequency}Hz`);
     return id;
   }
 
@@ -34,6 +35,7 @@ export class AudioNodeManager {
     if (node) {
       try {
         // Ensure proper cleanup
+        console.log(`[DEBUG] Cleaning up node ${id} (freq=${node.frequency}Hz)`);
         node.gainNode.disconnect();
         node.source.disconnect();
       } catch (e) {
@@ -45,12 +47,20 @@ export class AudioNodeManager {
 
   cleanup(): void {
     const now = performance.now();
+    let cleanedCount = 0;
     for (const [id, node] of this.nodes.entries()) {
       // Remove nodes that have been running for more than 30 seconds
       // or nodes that have zero gain (finished fading out)
-      if (now - node.startTime > 30000 || node.gainNode.gain.value <= 0.001) {
+      const age = now - node.startTime;
+      const gain = node.gainNode.gain.value;
+      if (age > 30000 || gain <= 0.001) {
+        console.log(`[DEBUG] Auto-cleaning node ${id} (age=${(age/1000).toFixed(1)}s, gain=${gain.toFixed(3)})`);
         this.remove(id);
+        cleanedCount++;
       }
+    }
+    if (cleanedCount > 0) {
+      console.log(`[DEBUG] Cleaned up ${cleanedCount} nodes, ${this.nodes.size} remaining`);
     }
   }
 

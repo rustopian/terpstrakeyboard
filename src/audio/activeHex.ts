@@ -2,7 +2,7 @@ import { Point } from '../core/geometry';
 import { hexCoordsToCents } from '../grid/hexUtils';
 import { updateChordDisplay } from './chordRecognition';
 import type { AudioSettings } from '../settings/SettingsTypes';
-import { noteEventManager } from './NoteEventManager';
+import noteEventManager from './NoteEventManager';
 import { getMidiFromCoords } from './audioHandler';
 
 let settings: AudioSettings | undefined;

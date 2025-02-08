@@ -18,7 +18,6 @@ import {
     hasDisplayProps,
     hasGridProps
 } from './SettingsTypes';
-import { audioNodeManager } from '../audio/AudioNodeManager';
 
 /**
  * Structure for a preset configuration
@@ -61,40 +60,41 @@ export class SettingsManager {
     }
 
     public updateTiltVolume(): void {
-        const enabledCheckbox = document.getElementById('tilt_volume_enabled') as HTMLInputElement;
-        const axisSelect = document.getElementById('tilt_volume_axis') as HTMLSelectElement;
+        // Get checkbox state
+        const checkbox = document.getElementById('tilt_volume_enabled') as HTMLInputElement;
+        const axis = document.getElementById('tilt_volume_axis') as HTMLSelectElement;
         
-        this.settings.tiltVolumeEnabled = enabledCheckbox.checked;
-        this.settings.tiltVolumeAxis = axisSelect.value as 'x' | 'z';
-        
+        // Update settings
+        this.settings.tiltVolumeEnabled = checkbox?.checked ?? false;
+        this.settings.tiltVolumeAxis = (axis?.value as 'x' | 'z') || 'x';
+
         if (this.settings.tiltVolumeEnabled) {
             this.startTiltSensor();
         } else {
             this.stopTiltSensor();
-            // Reset volume to full
             this.settings.tiltVolume = 1.0;
-            this.updateAllActiveNoteVolumes();
         }
+        
+        // Update window.settings to ensure synchronization
+        window.settings = {
+            ...window.settings,
+            tiltVolumeEnabled: this.settings.tiltVolumeEnabled,
+            tiltVolumeAxis: this.settings.tiltVolumeAxis,
+            tiltVolume: this.settings.tiltVolume
+        };
+
+        this.updateActiveNoteGains();
     }
 
     private startTiltSensor(): void {
-        // Check if DeviceOrientationEvent is available
-        if (!window.DeviceOrientationEvent) {
-            console.warn('Device orientation not supported');
-            return;
-        }
-
-        // Request permission if needed (iOS 13+)
-        if ((DeviceOrientationEvent as any).requestPermission) {
-            (DeviceOrientationEvent as any).requestPermission()
-                .then((response: string) => {
-                    if (response === 'granted') {
-                        this.attachTiltListener();
-                    }
-                })
-                .catch(console.error);
-        } else {
+        if (window.DeviceOrientationEvent) {
             this.attachTiltListener();
+            console.log('[DEBUG] Tilt sensor started');
+        } else {
+            console.warn('[DEBUG] Device orientation not supported');
+            this.settings.tiltVolumeEnabled = false;
+            const checkbox = document.getElementById('tilt_volume_enabled') as HTMLInputElement;
+            if (checkbox) checkbox.checked = false;
         }
     }
 
@@ -102,27 +102,35 @@ export class SettingsManager {
         const handleOrientation = (event: DeviceOrientationEvent) => {
             if (!this.settings.tiltVolumeEnabled) return;
 
-            // beta is front-to-back tilt (x-axis)
-            // gamma is left-to-right tilt (z-axis)
-            const angle = this.settings.tiltVolumeAxis === 'x' ? event.beta : event.gamma;
-            
+            const axis = this.settings.tiltVolumeAxis;
+            let angle: number | null = null;
+
+            if (axis === 'x' && event.beta !== null) {
+                // Front-to-back tilt (beta) ranges from -180 to 180
+                angle = event.beta;
+            } else if (axis === 'z' && event.gamma !== null) {
+                // Left-to-right tilt (gamma) ranges from -90 to 90
+                angle = event.gamma;
+            }
+
             if (angle !== null) {
-                // Map -45° to 45° to volume range 0 to 1
-                const volume = this.mapTiltToVolume(angle, -45, 45);
-                if (this.settings.tiltVolume !== volume) {
+                // Map angle to volume based on axis
+                const minAngle = axis === 'x' ? -90 : -45;
+                const maxAngle = axis === 'x' ? 90 : 45;
+                const volume = this.mapTiltToVolume(angle, minAngle, maxAngle);
+                
+                // Only update if volume has changed significantly
+                if (Math.abs(volume - this.settings.tiltVolume) > 0.01) {
                     this.settings.tiltVolume = volume;
-                    this.updateAllActiveNoteVolumes();
+                    window.settings.tiltVolume = volume; // Ensure window.settings is in sync
+                    this.updateActiveNoteGains();
+                    console.log(`[DEBUG] Tilt volume updated: ${volume.toFixed(3)} (${axis}-axis angle: ${angle.toFixed(1)}°)`);
                 }
             }
         };
 
-        window.addEventListener('deviceorientation', handleOrientation);
-        this.tiltSensorSubscription = window.setInterval(() => {
-            // Keep screen on for tilt control
-            if (navigator.wakeLock) {
-                navigator.wakeLock.request('screen').catch(console.error);
-            }
-        }, 30000);
+        // Bind the event listener
+        window.addEventListener('deviceorientation', handleOrientation, true);
     }
 
     private stopTiltSensor(): void {
@@ -138,30 +146,23 @@ export class SettingsManager {
         return (clamped - minAngle) / (maxAngle - minAngle);
     }
 
-    public updateAllActiveNoteVolumes(): void {
-        if (!this.settings.audioContext) return;
+    public updateActiveNoteGains(): void {
+        const audioCtx = window.settings?.audioContext;
+        if (!audioCtx) {
+            console.log('[DEBUG] No audio context available for gain update');
+            return;
+        }
 
-        const baseGain = 0.3; // Match the initial gain from audioHandler
-        const currentTime = this.settings.audioContext.currentTime;
-        const rampTime = 0.1; // Increased for smoother changes
+        // Get the current gain values from window.settings to ensure we're using the latest values
+        const instrumentFade = window.settings.instrumentFade ?? 0.3;
+        const tiltMultiplier = window.settings.tiltVolumeEnabled ? window.settings.tiltVolume : 1;
+        const effectiveGain = instrumentFade * tiltMultiplier;
 
-        // Update volume for all active notes
-        for (const hex of this.settings.activeHexObjects) {
-            if (hex.nodeId) {
-                const nodePair = audioNodeManager.getNode(hex.nodeId);
-                if (nodePair) {
-                    const gainNode = nodePair.gainNode;
-                    const targetGain = baseGain * this.settings.tiltVolume;
+        console.log(`[DEBUG] Updating all active note gains to ${effectiveGain.toFixed(3)} (tiltMultiplier: ${tiltMultiplier.toFixed(3)})`);
 
-                    // Instead of canceling, schedule from the current value
-                    const currentGain = gainNode.gain.value;
-                    gainNode.gain.setValueAtTime(currentGain, currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(
-                        Math.max(0.0001, targetGain), // Prevent zero value for exponential ramp
-                        currentTime + rampTime
-                    );
-                }
-            }
+        // Use the NoteEventManager to update all gains with the effective gain value
+        if (window.noteEventManager) {
+            window.noteEventManager.updateAllGains(effectiveGain);
         }
     }
 

@@ -216,21 +216,28 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     // Map current angle to volume using same function as device tilt
     const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -45, 45);
     
-    // Update settings
+    // Update both settings objects
     settings.tiltVolumeEnabled = true;
     settings.tiltVolumeAxis = isXAxis ? 'x' : 'z';
     settings.tiltVolume = volume;
 
-    // Update all active note volumes
-    window.settingsManager.updateAllActiveNoteVolumes();
+    // Ensure window.settings is updated
+    window.settings.tiltVolumeEnabled = true;
+    window.settings.tiltVolumeAxis = isXAxis ? 'x' : 'z';
+    window.settings.tiltVolume = volume;
 
-    console.log(`[DEBUG] Tilt animation: angle=${currentTiltAngle.toFixed(2)}, volume=${volume.toFixed(2)}`);
+    console.log(`[DEBUG] Tilt animation: angle=${currentTiltAngle.toFixed(2)}, volume=${volume.toFixed(2)}, settings.tiltVolume=${settings.tiltVolume.toFixed(2)}, window.settings.tiltVolume=${window.settings.tiltVolume.toFixed(2)}`);
+
+    // Update all active note volumes using the consolidated method
+    window.settingsManager.updateActiveNoteGains();
 
     // Continue animation if we haven't reached the target
     if (Math.abs(targetAngle - currentTiltAngle) > 0.01) {
       tiltAnimationFrame = requestAnimationFrame(animateTilt);
     } else {
       tiltAnimationFrame = null;
+      // Ensure final volume is set correctly
+      window.settingsManager.updateActiveNoteGains();
     }
   }
 

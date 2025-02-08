@@ -9,6 +9,7 @@ import type { Settings } from '../settings/Settings';
 declare global {
   interface Window {
     settings: Settings;
+    noteEventManager: NoteEventManager;
   }
 }
 
@@ -34,12 +35,20 @@ export class NoteEventManager {
   private midiEnabled: boolean = false;
   private midiOutput: WebMidiOutput | null = null;
   private sustain: boolean = false;
-  private audioContext: AudioContext;
   
   constructor() {
-    // Clean up any lingering notes periodically
+    // Clean up any lingering notes periodically.
     setInterval(() => this.cleanup(), 5000);
-    this.audioContext = new AudioContext();
+    // Do not block creation even if global settings is not yet defined.
+  }
+
+  // Getter to always retrieve the latest AudioContext from global settings.
+  private get audioContext(): AudioContext {
+    const ctx = window.settings?.audioContext;
+    if (!ctx) {
+      throw new Error("AudioContext is not available. It may not have been initialized yet.");
+    }
+    return ctx;
   }
 
   setMidiOutput(output: WebMidiOutput | null): void {
@@ -62,13 +71,15 @@ export class NoteEventManager {
     const key = this.getNoteKey(event.coords);
     
     if (event.type === 'noteOn') {
-      // Handle note on
+      // Handle note on.
       if (this.midiEnabled && this.midiOutput) {
         this.midiOutput.playNote(event.midiNote, [1]);
       } else {
         const buffer = sampleManager.getBuffer(event.frequency);
         if (buffer && !this.activeNotes.has(key)) {
-          console.log(`[DEBUG] Playing note: ${event.frequency.toFixed(3)} Hz (MIDI: ${event.midiNote})`);
+          console.log(
+            `[DEBUG] Playing note: ${event.frequency.toFixed(3)} Hz (MIDI: ${event.midiNote})`
+          );
           const { source, gainNode } = await this.createAudioNodes(buffer, event.frequency);
           const nodeId = audioNodeManager.add(gainNode, source, event.frequency);
           
@@ -79,18 +90,29 @@ export class NoteEventManager {
             nodeId,
             startTime: Date.now()
           });
+          
+          // Propagate the nodeId to the corresponding ActiveHex (if any).
+          if (window.settings && window.settings.activeHexObjects) {
+            for (const hex of window.settings.activeHexObjects) {
+              if (hex.coords.equals(event.coords)) {  // Assuming Point.equals is defined.
+                hex.nodeId = nodeId;
+              }
+            }
+          }
         }
       }
       
-      // Update display
-      drawHex(event.coords, centsToColor(hexCoordsToCents(event.coords), true));
+      // Update display (coloring the hex).
+      drawHex(
+        event.coords,
+        centsToColor(hexCoordsToCents(event.coords), true)
+      );
       
     } else {
-      // Handle note off
+      // Handle note off.
       const note = this.activeNotes.get(key);
       if (note) {
         if (this.sustain) {
-          // Keep the note but mark it for release when sustain ends
           note.sustainHeld = true;
         } else {
           if (this.midiEnabled && this.midiOutput) {
@@ -105,8 +127,11 @@ export class NoteEventManager {
         }
       }
       
-      // Update display
-      drawHex(event.coords, centsToColor(hexCoordsToCents(event.coords), false));
+      // Update display for note off.
+      drawHex(
+        event.coords,
+        centsToColor(hexCoordsToCents(event.coords), false)
+      );
     }
   }
 
@@ -114,20 +139,30 @@ export class NoteEventManager {
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     
-    // Get the base frequency of the sample we're using
-    const sampleBaseFreq = frequency > 622 ? 880 :
-                          frequency > 311 ? 440 :
-                          frequency > 155 ? 220 : 110;
+    // Ensure no unintended connections exist:
+    source.disconnect();
     
-    // Calculate playback rate to achieve desired frequency from this sample
+    const sampleBaseFreq = frequency > 622 ? 880 :
+                           frequency > 311 ? 440 :
+                           frequency > 155 ? 220 : 110;
     source.playbackRate.value = frequency / sampleBaseFreq;
     
     const gainNode = this.audioContext.createGain();
+    // Use the global settings (make sure window.settings is in sync with your SettingsManager)
     const settings = window.settings;
-    const baseGain = 0.3; // Initial gain
+    const baseGain = settings?.instrumentFade || 0.3;
     const tiltVolume = settings?.tiltVolumeEnabled ? settings.tiltVolume : 1.0;
-    gainNode.gain.value = baseGain * tiltVolume; // Apply tilt volume if enabled
+    const targetGain = baseGain * tiltVolume;
     
+    // Set initial gain with proper ramping
+    const currentTime = this.audioContext.currentTime;
+    gainNode.gain.cancelScheduledValues(currentTime);
+    gainNode.gain.setValueAtTime(0, currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetGain), currentTime + 0.02);
+    
+    console.log(`[DEBUG] Creating note with gain ${targetGain.toFixed(3)} (base: ${baseGain.toFixed(3)}, tilt: ${tiltVolume.toFixed(3)})`);
+    
+    // Important: Ensure the source is connected *only* via the gain node.
     source.connect(gainNode);
     gainNode.connect(this.audioContext.destination);
     
@@ -153,7 +188,10 @@ export class NoteEventManager {
           }
         }
         this.activeNotes.delete(key);
-        drawHex(note.coords, centsToColor(hexCoordsToCents(note.coords), false));
+        drawHex(
+          note.coords,
+          centsToColor(hexCoordsToCents(note.coords), false)
+        );
       }
     }
   }
@@ -161,13 +199,16 @@ export class NoteEventManager {
   private cleanup(): void {
     const now = Date.now();
     for (const [key, note] of this.activeNotes.entries()) {
-      // Clean up notes that have been active for too long (30 seconds)
+      // Clean up notes active for more than 30 seconds.
       if (now - note.startTime > 30000) {
         this.activeNotes.delete(key);
         if (note.nodeId) {
           audioNodeManager.remove(note.nodeId);
         }
-        drawHex(note.coords, centsToColor(hexCoordsToCents(note.coords), false));
+        drawHex(
+          note.coords,
+          centsToColor(hexCoordsToCents(note.coords), false)
+        );
       }
     }
   }
@@ -181,10 +222,51 @@ export class NoteEventManager {
       if (note.nodeId) {
         audioNodeManager.remove(note.nodeId);
       }
-      drawHex(note.coords, centsToColor(hexCoordsToCents(note.coords), false));
+      drawHex(
+        note.coords,
+        centsToColor(hexCoordsToCents(note.coords), false)
+      );
       this.activeNotes.delete(key);
+    }
+  }
+
+  // Update gains for all active notes with provided target gain
+  updateAllGains(targetGain?: number): void {
+    const settings = window.settings;
+    if (!settings) return;
+
+    // If no targetGain provided, calculate it from settings
+    if (targetGain === undefined) {
+      const baseGain = settings.instrumentFade || 0.3;
+      const tiltVolume = settings.tiltVolumeEnabled ? settings.tiltVolume : 1.0;
+      targetGain = baseGain * tiltVolume;
+    }
+
+    console.log(`[DEBUG] Updating all gains to ${targetGain.toFixed(3)}`);
+
+    const currentTime = this.audioContext.currentTime;
+    for (const note of this.activeNotes.values()) {
+      if (note.nodeId) {
+        const nodePair = audioNodeManager.getNode(note.nodeId);
+        if (nodePair?.gainNode) {
+          const gainNode = nodePair.gainNode;
+          
+          // Cancel any scheduled values
+          gainNode.gain.cancelScheduledValues(currentTime);
+          
+          // Set current gain and ramp to new target gain
+          gainNode.gain.setValueAtTime(gainNode.gain.value, currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(
+            Math.max(0.0001, targetGain), // Ensure we never go to zero for exponential ramp
+            currentTime + 0.01 // Even shorter ramp time for more responsive tilt
+          );
+        }
+      }
     }
   }
 }
 
-export const noteEventManager = new NoteEventManager(); 
+// Create and expose a singleton instance
+const noteEventManager = new NoteEventManager();
+window.noteEventManager = noteEventManager;
+export default noteEventManager; 

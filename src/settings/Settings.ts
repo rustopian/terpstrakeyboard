@@ -61,6 +61,7 @@ export interface Settings {
   tiltVolumeEnabled: boolean;
   tiltVolumeAxis: 'x' | 'z';  // 'x' for front-to-back, 'z' for left-to-right
   tiltVolume: number;  // Current volume multiplier from tilt [0-1]
+  instrumentFade: number;
 }
 
 // Default settings
@@ -121,5 +122,6 @@ export const defaultSettings: Settings = {
   notationSystem: 'Standard',
   tiltVolumeEnabled: false,
   tiltVolumeAxis: 'x',
-  tiltVolume: 1.0
+  tiltVolume: 1.0,
+  instrumentFade: 0.3
 };
