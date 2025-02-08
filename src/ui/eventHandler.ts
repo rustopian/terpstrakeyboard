@@ -186,7 +186,7 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
 
   // Target angle based on key state
   const targetAngle: number = isKeyDown 
-    ? (isShift ? 90 : (isCtrl ? -90 : 0))  // 90° for Shift (95% volume), -90° for Ctrl (0% volume)
+    ? (isShift ? 45 : (isCtrl ? -45 : 0))  // 90° for Shift (95% volume), -90° for Ctrl (0% volume)
     : 0;  // Return to center (50% volume) on key release
   
   let lastTime = performance.now();
