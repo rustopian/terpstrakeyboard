@@ -99,8 +99,18 @@ export class SettingsManager {
     }
 
     private attachTiltListener(): void {
+        // Debounce the orientation handler to prevent excessive updates
+        let lastUpdate = 0;
+        const DEBOUNCE_INTERVAL = 100; // ms
+
         const handleOrientation = (event: DeviceOrientationEvent) => {
+            // Skip if tilt volume is disabled
             if (!this.settings.tiltVolumeEnabled) return;
+
+            // Debounce updates to prevent overwhelming the system
+            const now = Date.now();
+            if (now - lastUpdate < DEBOUNCE_INTERVAL) return;
+            lastUpdate = now;
 
             const axis = this.settings.tiltVolumeAxis;
             let angle: number | null = null;
@@ -123,14 +133,29 @@ export class SettingsManager {
                 if (Math.abs(volume - this.settings.tiltVolume) > 0.01) {
                     this.settings.tiltVolume = volume;
                     window.settings.tiltVolume = volume; // Ensure window.settings is in sync
-                    this.updateActiveNoteGains();
-                    console.log(`[DEBUG] Tilt volume updated: ${volume.toFixed(3)} (${axis}-axis angle: ${angle.toFixed(1)}°, zero: ${this.settings.tiltZeroPoint.toFixed(1)}°)`);
+                    
+                    // Use requestAnimationFrame for smoother updates
+                    requestAnimationFrame(() => {
+                        this.updateActiveNoteGains();
+                    });
                 }
             }
         };
 
-        // Bind the event listener
-        window.addEventListener('deviceorientation', handleOrientation, true);
+        // Request permission for device orientation on iOS
+        if (typeof DeviceOrientationEvent !== 'undefined' && 
+            typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+            (DeviceOrientationEvent as any).requestPermission()
+                .then((permissionState: string) => {
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation, { passive: true });
+                    }
+                })
+                .catch(console.error);
+        } else {
+            // For non-iOS devices or if permission API is not available
+            window.addEventListener('deviceorientation', handleOrientation, { passive: true });
+        }
     }
 
     private stopTiltSensor(): void {

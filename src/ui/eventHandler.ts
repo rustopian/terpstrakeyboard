@@ -489,9 +489,11 @@ function setupTouchEvents(): void {
   if (!settings) return;
   
   state.isTouchDown = false;
-  settings.canvas.addEventListener("touchstart", handleTouch, false);
-  settings.canvas.addEventListener("touchend", handleTouch, false);
-  settings.canvas.addEventListener("touchmove", handleTouch, false);
+  
+  // Add touch event listeners with passive: false only for the canvas
+  settings.canvas.addEventListener("touchstart", handleTouch, { passive: false });
+  settings.canvas.addEventListener("touchend", handleTouch, { passive: false });
+  settings.canvas.addEventListener("touchmove", handleTouch, { passive: false });
 }
 
 /**
@@ -511,7 +513,12 @@ function setupTouchEvents(): void {
 function handleTouch(e: TouchEvent): void {
   if (!settings) return;
   
-  e.preventDefault();
+  // Only prevent default for touch events that are directly interacting with the keyboard
+  // This allows device orientation events to work properly
+  if (e.target === settings.canvas) {
+    e.preventDefault();
+  }
+  
   if (state.pressedKeys.length !== 0 || state.isMouseDown) {
     state.isTouchDown = false;
     return;
@@ -537,7 +544,7 @@ function handleTouch(e: TouchEvent): void {
     identifier: touch.identifier,
     coords: new Point(
       touch.clientX - rect.left,
-      touch.clientY - rect.top // No scroll area offset needed here
+      touch.clientY - rect.top
     )
   }));
 
@@ -549,7 +556,7 @@ function handleTouch(e: TouchEvent): void {
     // Check if this note's touch still exists and if it moved
     for (const touch of touches) {
       const identifier = touch.identifier;
-      const hexCoords = touch.coords;
+      const hexCoords = getHexCoordsAt(touch.coords);
       if (hex.touchId === identifier) {
         found = true;
         if (!hexCoords.equals(hex.coords)) {
@@ -561,7 +568,7 @@ function handleTouch(e: TouchEvent): void {
     }
 
     // If touch no longer exists, remove the note
-    if (!found) {
+    if (!found && !settings.toggle_mode) {
       handleNote(hex.coords, false, hex.touchId);
     }
   }
