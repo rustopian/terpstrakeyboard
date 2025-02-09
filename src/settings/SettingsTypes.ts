@@ -80,6 +80,7 @@ export type GridSettings = GridRequired;
  * @property activeHexObjects - Currently active/sounding notes
  * @property sustainedNotes - Notes held by sustain
  * @property fadeoutTime - Note release time in seconds
+ * @property glissandoMode - Whether glissando mode is enabled
  */
 export interface EventHandlerRequired {
   canvas: HTMLCanvasElement;
@@ -108,6 +109,7 @@ export interface EventHandlerRequired {
   tiltVolumeEnabled: boolean;
   tiltVolumeAxis: string;
   tiltVolume: number;
+  glissandoMode: boolean;
 }
 
 /**

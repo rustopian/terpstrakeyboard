@@ -55,6 +55,7 @@ export interface Settings {
   useFullChordNotation?: boolean;
   midi_input: boolean;
   toggle_mode: boolean;
+  glissandoMode: boolean;
   learningChord: string[];
   learningChordSymbol: string;
   notationSystem: string;
@@ -118,6 +119,7 @@ export const defaultSettings: Settings = {
   useFullChordNotation: false,
   midi_input: false,
   toggle_mode: false,
+  glissandoMode: true,
   learningChord: [],
   learningChordSymbol: '',
   notationSystem: 'Standard',

@@ -464,8 +464,8 @@ function mouseActive(e: MouseEvent): void {
   
   if (!state.activeHexObjects?.length) {
     handleNote(hexCoords, true);
-  } else {
-    // Always deactivate the previous note in non-toggle mode for glissando behavior
+  } else if (settings.glissandoMode) {
+    // Only change notes if in glissando mode
     const oldHex = state.activeHexObjects[0];
     if (!hexCoords.equals(oldHex.coords)) {
       handleNote(oldHex.coords, false);
@@ -564,32 +564,61 @@ function handleTouch(e: TouchEvent): void {
     )
   }));
 
-  // First, handle existing notes that have moved
-  for (let i = state.activeHexObjects.length - 1; i >= 0; i--) {
-    const hex = state.activeHexObjects[i] as TouchActiveHex;
-    let found = false;
+  // Handle touch end event - remove notes for touches that are gone
+  if (e.type === 'touchend' || e.type === 'touchcancel') {
+    for (let i = state.activeHexObjects.length - 1; i >= 0; i--) {
+      const hex = state.activeHexObjects[i] as TouchActiveHex;
+      let touchExists = false;
 
-    // Check if this note's touch still exists and if it moved
-    for (const touch of touches) {
-      const identifier = touch.identifier;
-      const hexCoords = getHexCoordsAt(touch.coords);
-      if (hex.touchId === identifier) {
-        found = true;
-        if (!hexCoords.equals(hex.coords)) {
-          handleNote(hex.coords, false, hex.touchId);
-          handleNote(hexCoords, true, identifier);
+      // Check if this note's touch still exists
+      for (const touch of touches) {
+        if (hex.touchId === touch.identifier) {
+          touchExists = true;
+          break;
         }
-        break;
+      }
+
+      // Remove note if touch is gone
+      if (!touchExists) {
+        handleNote(hex.coords, false, hex.touchId);
       }
     }
-
-    // If touch no longer exists, remove the note
-    if (!found && !settings.toggle_mode) {
-      handleNote(hex.coords, false, hex.touchId);
-    }
+    return;
   }
 
-  // Then add any new touches
+  // Handle touch move
+  if (e.type === 'touchmove') {
+    if (settings.glissandoMode) {
+      // Glissando mode: Update notes when touches move
+      for (let i = state.activeHexObjects.length - 1; i >= 0; i--) {
+        const hex = state.activeHexObjects[i] as TouchActiveHex;
+        let found = false;
+
+        // Check if this note's touch still exists and if it moved
+        for (const touch of touches) {
+          const identifier = touch.identifier;
+          const hexCoords = getHexCoordsAt(touch.coords);
+          if (hex.touchId === identifier) {
+            found = true;
+            if (!hexCoords.equals(hex.coords)) {
+              handleNote(hex.coords, false, hex.touchId);
+              handleNote(hexCoords, true, identifier);
+            }
+            break;
+          }
+        }
+
+        // If touch no longer exists, remove the note
+        if (!found) {
+          handleNote(hex.coords, false, hex.touchId);
+        }
+      }
+    }
+    // When glissandoMode is false, we do nothing on touch move - notes stay where they started
+    return;
+  }
+
+  // Handle new touches (touchstart)
   for (let i = 0; i < e.targetTouches.length; i++) {
     const touch = e.targetTouches[i];
     let found = false;

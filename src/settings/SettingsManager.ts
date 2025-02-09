@@ -574,6 +574,8 @@ export class SettingsManager {
         this.settings.invert_updown = (document.getElementById('invert-updown') as HTMLInputElement).checked;
         this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
+        this.settings.toggle_mode = (document.getElementById('toggle_mode') as HTMLInputElement).checked;
+        this.settings.glissandoMode = (document.getElementById('glissando_mode') as HTMLInputElement).checked;
         
         // Get number root value if enum is enabled
         if (this.settings.enum) {
@@ -1228,7 +1230,8 @@ export class SettingsManager {
             'invert-updown': parameters.invert_updown,
             'show_intervals': parameters.show_intervals,
             'show_all_notes': parameters.show_all_notes,
-            'toggle_mode': parameters.toggle_mode
+            'toggle_mode': parameters.toggle_mode,
+            'glissando_mode': parameters.glissando_mode || 'true' // Default to true for backward compatibility
         };
 
         // Update each form input if parameter exists
@@ -1311,7 +1314,11 @@ export class SettingsManager {
 
         function getElementValue(id: string): string {
             const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
-            return element ? element.value : '';
+            if (!element) return '';
+            if (element instanceof HTMLInputElement && element.type === 'checkbox') {
+                return element.checked.toString();
+            }
+            return element.value;
         }
 
         // Add notation system to URL parameters
@@ -1332,7 +1339,7 @@ export class SettingsManager {
             "instrument", "enum", "equivSteps", "spectrum_colors",
             "fundamental_color", "no_labels", "midi_input", "invert-updown",
             "show_intervals", "show_all_notes", "key-image", "full-chord-notation",
-            "toggle_mode"
+            "toggle_mode", "glissando_mode"
         ];
 
         params.forEach(param => {
