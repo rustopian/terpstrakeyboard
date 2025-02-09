@@ -399,15 +399,20 @@ function handleNote(coords: Point, isActive: boolean, touchId?: number): ActiveH
 const mouseDown = (e: MouseEvent) => {
     if (!settings || state.pressedKeys.length !== 0 || state.isTouchDown) return;
     
-    console.log('[DEBUG] mouseDown - glissandoMode:', settings.glissandoMode);
+    // Get the latest settings from window.settings to ensure we have current values
+    const currentSettings = window.settings || settings;
+    console.log('[DEBUG] mouseDown - glissandoMode:', currentSettings.glissandoMode);
     
     state.isMouseDown = true;
     const screenCoords = getUnifiedPointerPosition(e);
     const hexCoords = getHexCoordsAt(screenCoords);
     
-    if (settings.toggle_mode) {
+    // Always remove any existing mousemove listener first
+    settings.canvas.removeEventListener("mousemove", mouseActive);
+    
+    if (currentSettings.toggle_mode) {
         // In toggle mode, just toggle the note
-        const note = hexCoords.x * settings.rSteps + hexCoords.y * settings.urSteps;
+        const note = hexCoords.x * currentSettings.rSteps + hexCoords.y * currentSettings.urSteps;
         handleNote(hexCoords, !isNoteActive(note));
     } else {
         // Store initial hex coordinates and activate the note
@@ -415,7 +420,7 @@ const mouseDown = (e: MouseEvent) => {
         handleNote(hexCoords, true);
         
         // Only add mousemove listener if glissando mode is enabled
-        if (settings.glissandoMode) {
+        if (currentSettings.glissandoMode) {
             console.log('[DEBUG] Adding mousemove listener - glissandoMode is true');
             settings.canvas.addEventListener("mousemove", mouseActive, false);
         } else {

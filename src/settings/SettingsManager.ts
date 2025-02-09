@@ -581,13 +581,38 @@ export class SettingsManager {
         this.settings.showIntervals = (document.getElementById('show_intervals') as HTMLInputElement).checked;
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
         this.settings.toggle_mode = (document.getElementById('toggle_mode') as HTMLInputElement).checked;
-        this.settings.glissandoMode = (document.getElementById('glissando_mode') as HTMLInputElement).checked;
+        
+        // Handle glissando mode update
+        const glissandoCheckbox = document.getElementById('glissando_mode') as HTMLInputElement;
+        if (glissandoCheckbox) {
+            const newGlissandoMode = glissandoCheckbox.checked;
+            
+            // Update both local settings and window.settings
+            this.settings.glissandoMode = newGlissandoMode;
+            if (window.settings) {
+                window.settings.glissandoMode = newGlissandoMode;
+            }
+            
+            // Force cleanup of any existing mousemove listeners on the canvas
+            if (this.settings.canvas) {
+                const mouseActive = (window as any).mouseActive;
+                if (mouseActive) {
+                    this.settings.canvas.removeEventListener("mousemove", mouseActive);
+                }
+                
+                // If mouse is currently down, release all notes to prevent stuck notes
+                if ((window as any).state?.isMouseDown) {
+                    (window as any).handleReleaseAll?.();
+                }
+            }
+            
+            console.log('[DEBUG] Updated glissandoMode:', newGlissandoMode);
+        }
         
         // Synchronize settings with window.settings
         if (window.settings) {
             window.settings.toggle_mode = this.settings.toggle_mode;
             window.settings.glissandoMode = this.settings.glissandoMode;
-            console.log('[DEBUG] Updated glissandoMode:', window.settings.glissandoMode);
         }
         
         // Get number root value if enum is enabled

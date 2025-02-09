@@ -113,6 +113,25 @@ export class SampleManager {
     this.samples.clear();
     this.currentInstrument = null;
   }
+
+  hasLoadedSamples(): boolean {
+    if (!this.currentInstrument) return false;
+    const instrumentSamples = this.samples.get(this.currentInstrument);
+    if (!instrumentSamples) return false;
+    
+    // Check if all required frequencies are loaded
+    const requiredFreqs: FrequencyKey[] = ['110', '220', '440', '880'];
+    return requiredFreqs.every(freq => {
+      const state = instrumentSamples.get(freq);
+      return state?.buffer && !state.loading && !state.error;
+    });
+  }
+
+  updateAudioContext(newContext: AudioContext): void {
+    this.audioContext = newContext;
+    // Clear existing samples since they're tied to the old context
+    this.clear();
+  }
 }
 
 export const sampleManager = new SampleManager(new AudioContext()); 

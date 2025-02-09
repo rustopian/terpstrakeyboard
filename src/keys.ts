@@ -1,5 +1,5 @@
 // Import audio functions
-import { initAudio, loadInstrumentSamples } from './audio/audioHandler';
+import { initAudio, loadInstrumentSamples, recoverAudioContext } from './audio/audioHandler';
 
 // Import event handling functions
 import { initEventHandlers } from './ui/eventHandler';
@@ -277,6 +277,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         console.error('[DEBUG] learning-note-root element not found');
     }
+
+    // Add visibility change handler for sleep/wake cycles
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && settings.audioContext) {
+            console.log('[DEBUG] Page became visible, checking audio context');
+            try {
+                await recoverAudioContext();
+                console.log('[DEBUG] Audio context recovered after visibility change');
+            } catch (error) {
+                console.error('[DEBUG] Failed to recover audio context:', error);
+            }
+        }
+    });
 
     // console.log("[DEBUG] All setup complete, calling goKeyboard...");
     goKeyboard();

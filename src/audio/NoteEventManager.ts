@@ -35,6 +35,7 @@ export class NoteEventManager {
   private midiEnabled: boolean = false;
   private midiOutput: WebMidiOutput | null = null;
   private sustain: boolean = false;
+  private _audioContext: AudioContext | null = null;
   
   constructor() {
     // Clean up any lingering notes periodically.
@@ -42,13 +43,26 @@ export class NoteEventManager {
     // Do not block creation even if global settings is not yet defined.
   }
 
-  // Getter to always retrieve the latest AudioContext from global settings.
+  // Getter to always retrieve the latest AudioContext from global settings or local backup
   private get audioContext(): AudioContext {
+    // First try to get from global settings
     const ctx = window.settings?.audioContext;
-    if (!ctx) {
-      throw new Error("AudioContext is not available. It may not have been initialized yet.");
+    if (ctx) {
+      this._audioContext = ctx; // Keep our local reference in sync
+      return ctx;
     }
-    return ctx;
+    
+    // Fall back to our local context if we have one
+    if (this._audioContext) {
+      return this._audioContext;
+    }
+    
+    throw new Error("AudioContext is not available. It may not have been initialized yet.");
+  }
+
+  // Setter for local audio context
+  private set audioContext(ctx: AudioContext) {
+    this._audioContext = ctx;
   }
 
   setMidiOutput(output: WebMidiOutput | null): void {
@@ -268,6 +282,39 @@ export class NoteEventManager {
           }
         }
       }
+    }
+  }
+
+  updateAudioContext(newContext: AudioContext): void {
+    // First stop all notes tied to the old context
+    this.stopAllNotes();
+    
+    // Update our local context reference
+    this._audioContext = newContext;
+    
+    // Ensure window.settings is also updated
+    if (window.settings) {
+      window.settings.audioContext = newContext;
+    }
+  }
+
+  private stopAllNotes(): void {
+    for (const [key, note] of this.activeNotes) {
+      if (note.nodeId) {
+        const nodePair = audioNodeManager.getNode(note.nodeId);
+        if (nodePair) {
+          const { source, gainNode } = nodePair;
+          try {
+            gainNode.disconnect();
+            source.disconnect();
+            source.stop();
+          } catch (e) {
+            console.warn('[DEBUG] Error stopping note:', e);
+          }
+          audioNodeManager.remove(note.nodeId);
+        }
+      }
+      this.activeNotes.delete(key);
     }
   }
 }

@@ -173,4 +173,68 @@ export async function loadInstrumentSamples(): Promise<void> {
 
 function getBaseFrequency(sampleRate: number): number {
   return sampleRate === 44100 ? 440 : 880;
+}
+
+export async function recoverAudioContext(): Promise<void> {
+  if (!settings.audioContext) {
+    console.log('[DEBUG] No audio context to recover, creating new one');
+    const newContext = await initAudio();
+    if (!newContext) {
+      throw new Error('Failed to create new AudioContext');
+    }
+    settings.audioContext = newContext;
+    sampleManager.updateAudioContext(newContext);
+    noteEventManager.updateAudioContext(newContext);
+    return;
+  }
+
+  try {
+    // First try to resume the context
+    if (settings.audioContext.state === 'suspended') {
+      await settings.audioContext.resume();
+      console.log('[DEBUG] AudioContext resumed from suspended state');
+    }
+
+    // Verify audio is working by attempting a test tone
+    const testOsc = settings.audioContext.createOscillator();
+    const testGain = settings.audioContext.createGain();
+    testGain.gain.value = 0; // Silent test
+    testOsc.connect(testGain);
+    testGain.connect(settings.audioContext.destination);
+    testOsc.start();
+    testOsc.stop(settings.audioContext.currentTime + 0.001);
+
+    // Check if we need to reload samples
+    if (!sampleManager.hasLoadedSamples()) {
+      console.log('[DEBUG] Reloading instrument samples');
+      await loadInstrumentSamples();
+    }
+
+    // If we get here without error, the context is working
+    console.log('[DEBUG] Audio context verified working');
+
+  } catch (error) {
+    console.log('[DEBUG] Error with existing AudioContext, creating new one:', error);
+    
+    try {
+      // Create new context
+      const newContext = await initAudio();
+      if (!newContext) {
+        throw new Error('Failed to create new AudioContext');
+      }
+
+      // Update all managers with new context
+      settings.audioContext = newContext;
+      sampleManager.updateAudioContext(newContext);
+      noteEventManager.updateAudioContext(newContext);
+
+      // Reload samples with new context
+      await loadInstrumentSamples();
+      
+      console.log('[DEBUG] Successfully created and initialized new AudioContext');
+    } catch (retryError) {
+      console.error('[DEBUG] Failed to recover audio system:', retryError);
+      throw new Error('Failed to recover audio system after multiple attempts');
+    }
+  }
 } 
