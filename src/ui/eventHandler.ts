@@ -38,6 +38,7 @@ interface KeyboardState {
   isMouseDown: boolean;
   isTouchDown: boolean;
   isSustainOn: boolean;
+  initialHexCoords?: Point;
 }
 
 let settings: EventHandlerSettings;
@@ -187,8 +188,8 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
 
   // Target angle based on key state
   const targetAngle: number = isKeyDown 
-    ? (isShift ? 20 : (isCtrl ? -20 : 0))  // 12° for Shift (95% volume), -12° for Ctrl (0% volume)
-    : 0;  // Return to center (50% volume) on key release
+    ? (isShift ? 20 : (isCtrl ? -20 : 0))  // 20° for Shift (up), -20° for Ctrl (down)
+    : 0;  // Return to center on key release
   
   let lastTime = performance.now();
 
@@ -208,12 +209,10 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     // Map current angle to volume using same function as device tilt
     const volume = window.settingsManager.mapTiltToVolume(currentTiltAngle, -20, 20);
     
-    // Update both settings objects
+    // Update settings objects
     settings.tiltVolumeEnabled = true;
     settings.tiltVolumeAxis = 'x';  // Always use x-axis for keyboard tilt
     settings.tiltVolume = volume;
-
-    // Ensure window.settings is updated
     window.settings.tiltVolumeEnabled = true;
     window.settings.tiltVolumeAxis = 'x';
     window.settings.tiltVolume = volume;
@@ -221,26 +220,31 @@ function handleTiltVolume(keyCode: number, isKeyDown: boolean): void {
     // Update scroll area color based on volume
     const scrollArea = document.querySelector('.scroll-area') as HTMLElement;
     if (scrollArea) {
-      scrollArea.classList.remove('volume-low', 'volume-medium', 'volume-high');
-      if (volume < 0.33) {
-        scrollArea.classList.add('volume-low');
-      } else if (volume < 0.66) {
-        scrollArea.classList.add('volume-medium');
-      } else {
-        scrollArea.classList.add('volume-high');
-      }
-      
       scrollArea.style.backgroundColor = getTiltVolumeColor(volume);
     }
 
-    // Update all active note gains
-    window.noteEventManager.updateAllGains();
+    // Update all active note gains using the NoteEventManager
+    if (window.noteEventManager) {
+      const baseVolume = settings.instrumentFade ?? 0.3;
+      const effectiveVolume = volume * baseVolume;
+      console.log('[DEBUG] Updating volume:', { 
+        tiltAngle: currentTiltAngle, 
+        tiltVolume: volume, 
+        baseVolume, 
+        effectiveVolume 
+      });
+      window.noteEventManager.updateAllGains(effectiveVolume);
+    }
 
     // Continue animation if we haven't reached the target
     if (Math.abs(angleDiff) > 0.01) {
       tiltAnimationFrame = requestAnimationFrame(animateTilt);
     } else {
       tiltAnimationFrame = null;
+      console.log('[DEBUG] Tilt animation complete:', { 
+        finalAngle: currentTiltAngle, 
+        finalVolume: volume 
+      });
     }
   }
 
@@ -262,6 +266,7 @@ function onKeyDown(e: KeyboardEvent): void {
   
   // Handle tilt volume control keys
   if (e.keyCode === 16 || e.keyCode === 17) { // Shift or Ctrl
+    e.preventDefault(); // Prevent default browser behavior
     handleTiltVolume(e.keyCode, true);
     return;
   }
@@ -300,6 +305,7 @@ function onKeyUp(e: KeyboardEvent): void {
   
   // Handle tilt volume control keys
   if (e.keyCode === 16 || e.keyCode === 17) { // Shift or Ctrl
+    e.preventDefault(); // Prevent default browser behavior
     handleTiltVolume(e.keyCode, false);
     return;
   }
@@ -388,24 +394,34 @@ function handleNote(coords: Point, isActive: boolean, touchId?: number): ActiveH
  * Handles mouse button press events.
  * Behavior differs between toggle and non-toggle mode:
  * - Toggle mode: Toggles notes on/off
- * - Non-toggle mode: Activates notes and enables mousemove tracking
+ * - Non-toggle mode: Activates notes and enables mousemove tracking only in glissando mode
  */
 const mouseDown = (e: MouseEvent) => {
-  if (!settings || state.pressedKeys.length !== 0 || state.isTouchDown) return;
-  
-  state.isMouseDown = true;
-  const screenCoords = getUnifiedPointerPosition(e);
-  const hexCoords = getHexCoordsAt(screenCoords);
-  
-  if (settings.toggle_mode) {
-    // In toggle mode, just toggle the note
-    const note = hexCoords.x * settings.rSteps + hexCoords.y * settings.urSteps;
-    handleNote(hexCoords, !isNoteActive(note));
-  } else {
-    // In normal mode, activate the note
-    handleNote(hexCoords, true);
-    settings.canvas.addEventListener("mousemove", mouseActive, false);
-  }
+    if (!settings || state.pressedKeys.length !== 0 || state.isTouchDown) return;
+    
+    console.log('[DEBUG] mouseDown - glissandoMode:', settings.glissandoMode);
+    
+    state.isMouseDown = true;
+    const screenCoords = getUnifiedPointerPosition(e);
+    const hexCoords = getHexCoordsAt(screenCoords);
+    
+    if (settings.toggle_mode) {
+        // In toggle mode, just toggle the note
+        const note = hexCoords.x * settings.rSteps + hexCoords.y * settings.urSteps;
+        handleNote(hexCoords, !isNoteActive(note));
+    } else {
+        // Store initial hex coordinates and activate the note
+        state.initialHexCoords = hexCoords;
+        handleNote(hexCoords, true);
+        
+        // Only add mousemove listener if glissando mode is enabled
+        if (settings.glissandoMode) {
+            console.log('[DEBUG] Adding mousemove listener - glissandoMode is true');
+            settings.canvas.addEventListener("mousemove", mouseActive, false);
+        } else {
+            console.log('[DEBUG] Not adding mousemove listener - glissandoMode is false');
+        }
+    }
 };
 
 /**
@@ -416,62 +432,65 @@ const mouseDown = (e: MouseEvent) => {
  * - Cleans up activeHexObjects
  */
 const mouseUp = (_e: MouseEvent) => {
-  if (!settings) return;
-  
-  state.isMouseDown = false;
-  if (state.pressedKeys.length !== 0 || state.isTouchDown || settings.toggle_mode) {
-    return;
-  }
-  
-  settings.canvas.removeEventListener("mousemove", mouseActive);
-  if (state.activeHexObjects && state.activeHexObjects.length > 0) {
-    for (const hex of state.activeHexObjects) {
-      hex.noteOff();
-      removeActiveNote(hex);
-      const coords = hex.coords;
-      drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+    if (!settings) return;
+    
+    // Clear the initial hex coordinates
+    state.initialHexCoords = undefined;
+    
+    state.isMouseDown = false;
+    if (state.pressedKeys.length !== 0 || state.isTouchDown || settings.toggle_mode) {
+        return;
     }
-    state.activeHexObjects = [];
-  }
+    
+    // Always remove the mousemove listener
+    settings.canvas.removeEventListener("mousemove", mouseActive);
+    
+    // Release all active notes
+    if (state.activeHexObjects && state.activeHexObjects.length > 0) {
+        for (const hex of state.activeHexObjects) {
+            hex.noteOff();
+            removeActiveNote(hex);
+            const coords = hex.coords;
+            drawHex(coords, centsToColor(hexCoordsToCents(coords), false));
+        }
+        state.activeHexObjects = [];
+    }
 };
-
-/**
- * Sets up mouse event listeners on the canvas.
- * Initializes mouse state and attaches event handlers.
- */
-function setupMouseEvents(): void {
-  if (!settings) return;
-  
-  state.isMouseDown = false;
-  settings.canvas.addEventListener("mousedown", mouseDown, false);
-  settings.canvas.addEventListener("mouseup", mouseUp, false);
-}
 
 /**
  * Handles mouse movement for glissando behavior.
  * In non-toggle mode:
  * - Tracks mouse movement across hexes
- * - Deactivates old notes and activates new ones
- * - Provides smooth note transitions
+ * - Deactivates old notes and activates new ones in glissando mode
+ * - Only allows playing initial note in non-glissando mode
  * 
  * @param e - The mouse event
  */
 function mouseActive(e: MouseEvent): void {
-  if (!settings || settings.toggle_mode) return;
-  
-  const screenCoords = getUnifiedPointerPosition(e);
-  const hexCoords = getHexCoordsAt(screenCoords);
-  
-  if (!state.activeHexObjects?.length) {
-    handleNote(hexCoords, true);
-  } else if (settings.glissandoMode) {
-    // Only change notes if in glissando mode
-    const oldHex = state.activeHexObjects[0];
-    if (!hexCoords.equals(oldHex.coords)) {
-      handleNote(oldHex.coords, false);
-      handleNote(hexCoords, true);
+    if (!settings || settings.toggle_mode || !state.isMouseDown || !state.initialHexCoords || !settings.glissandoMode) {
+        console.log('[DEBUG] mouseActive early return - conditions:', {
+            hasSettings: !!settings,
+            toggleMode: settings?.toggle_mode,
+            isMouseDown: state.isMouseDown,
+            hasInitialCoords: !!state.initialHexCoords,
+            glissandoMode: settings?.glissandoMode
+        });
+        return;
     }
-  }
+    
+    console.log('[DEBUG] mouseActive - glissandoMode:', settings.glissandoMode);
+    
+    const screenCoords = getUnifiedPointerPosition(e);
+    const hexCoords = getHexCoordsAt(screenCoords);
+    
+    // Only proceed if we're in glissando mode
+    const activeHex = state.activeHexObjects[0];
+    if (activeHex && !hexCoords.equals(activeHex.coords)) {
+        handleNote(activeHex.coords, false);
+        handleNote(hexCoords, true);
+    } else if (!activeHex) {
+        handleNote(hexCoords, true);
+    }
 }
 
 /**
@@ -588,33 +607,33 @@ function handleTouch(e: TouchEvent): void {
 
   // Handle touch move
   if (e.type === 'touchmove') {
-    if (settings.glissandoMode) {
-      // Glissando mode: Update notes when touches move
-      for (let i = state.activeHexObjects.length - 1; i >= 0; i--) {
-        const hex = state.activeHexObjects[i] as TouchActiveHex;
-        let found = false;
+    if (!settings.glissandoMode) {
+      return; // Exit early if glissando mode is off - notes should stay where they started
+    }
+    // Glissando mode: Update notes when touches move
+    for (let i = state.activeHexObjects.length - 1; i >= 0; i--) {
+      const hex = state.activeHexObjects[i] as TouchActiveHex;
+      let found = false;
 
-        // Check if this note's touch still exists and if it moved
-        for (const touch of touches) {
-          const identifier = touch.identifier;
-          const hexCoords = getHexCoordsAt(touch.coords);
-          if (hex.touchId === identifier) {
-            found = true;
-            if (!hexCoords.equals(hex.coords)) {
-              handleNote(hex.coords, false, hex.touchId);
-              handleNote(hexCoords, true, identifier);
-            }
-            break;
+      // Check if this note's touch still exists and if it moved
+      for (const touch of touches) {
+        const identifier = touch.identifier;
+        const hexCoords = getHexCoordsAt(touch.coords);
+        if (hex.touchId === identifier) {
+          found = true;
+          if (!hexCoords.equals(hex.coords)) {
+            handleNote(hex.coords, false, hex.touchId);
+            handleNote(hexCoords, true, identifier);
           }
-        }
-
-        // If touch no longer exists, remove the note
-        if (!found) {
-          handleNote(hex.coords, false, hex.touchId);
+          break;
         }
       }
+
+      // If touch no longer exists, remove the note
+      if (!found) {
+        handleNote(hex.coords, false, hex.touchId);
+      }
     }
-    // When glissandoMode is false, we do nothing on touch move - notes stay where they started
     return;
   }
 
@@ -721,4 +740,16 @@ export function handleHexClick(event: MouseEvent | TouchEvent, hexCoords: { x: n
       deactivateNote(note);
     }
   }
+}
+
+/**
+ * Sets up mouse event listeners on the canvas.
+ * Initializes mouse state and attaches event handlers.
+ */
+function setupMouseEvents(): void {
+    if (!settings) return;
+    
+    state.isMouseDown = false;
+    settings.canvas.addEventListener("mousedown", mouseDown, false);
+    settings.canvas.addEventListener("mouseup", mouseUp, false);
 } 

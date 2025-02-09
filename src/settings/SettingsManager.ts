@@ -18,6 +18,7 @@ import {
     hasDisplayProps,
     hasGridProps
 } from './SettingsTypes';
+import { QueryData } from '../core/QueryData';
 
 /**
  * Structure for a preset configuration
@@ -399,6 +400,11 @@ export class SettingsManager {
         this.settings.useFullChordNotation = (document.getElementById('full-chord-notation') as HTMLInputElement)?.checked ?? false;
         this.settings.toggle_mode = (document.getElementById('toggle_mode') as HTMLInputElement)?.checked ?? false;
         
+        // Synchronize toggle_mode with window.settings
+        if (window.settings) {
+            window.settings.toggle_mode = this.settings.toggle_mode;
+        }
+        
         // Load key image settings
         const keyImageSelect = document.getElementById('key-image') as HTMLSelectElement;
         if (keyImageSelect) {
@@ -576,6 +582,13 @@ export class SettingsManager {
         this.settings.showAllNotes = (document.getElementById('show_all_notes') as HTMLInputElement).checked;
         this.settings.toggle_mode = (document.getElementById('toggle_mode') as HTMLInputElement).checked;
         this.settings.glissandoMode = (document.getElementById('glissando_mode') as HTMLInputElement).checked;
+        
+        // Synchronize settings with window.settings
+        if (window.settings) {
+            window.settings.toggle_mode = this.settings.toggle_mode;
+            window.settings.glissandoMode = this.settings.glissandoMode;
+            console.log('[DEBUG] Updated glissandoMode:', window.settings.glissandoMode);
+        }
         
         // Get number root value if enum is enabled
         if (this.settings.enum) {
@@ -1091,6 +1104,13 @@ export class SettingsManager {
             if (element) {
                 if (element.type === 'checkbox') {
                     element.checked = value === 'true';
+                    // Special handling for glissando mode to ensure it's updated everywhere
+                    if (key === 'glissando_mode') {
+                        this.settings.glissandoMode = value === 'true';
+                        if (window.settings) {
+                            window.settings.glissandoMode = value === 'true';
+                        }
+                    }
                 } else if (Array.isArray(value)) {
                     element.value = value.join('\n');
                 } else {
@@ -1241,6 +1261,13 @@ export class SettingsManager {
                 if (element) {
                     if (element.type === 'checkbox') {
                         element.checked = value === 'true';
+                        // Special handling for glissando mode to ensure it's updated everywhere
+                        if (id === 'glissando_mode') {
+                            this.settings.glissandoMode = value === 'true';
+                            if (window.settings) {
+                                window.settings.glissandoMode = value === 'true';
+                            }
+                        }
                     } else {
                         element.value = value;
                     }
@@ -1477,11 +1504,14 @@ export class SettingsManager {
 
         // Set up checkbox event listeners
         const checkboxes = ['no_labels', 'spectrum_colors', 'enum', 'show_all_notes', 
-                          'show_intervals', 'invert-updown', 'full-chord-notation', 'toggle_mode'];
+                          'show_intervals', 'invert-updown', 'full-chord-notation', 'toggle_mode', 'glissando_mode'];
         checkboxes.forEach(id => {
             const checkbox = document.getElementById(id) as HTMLInputElement;
             if (checkbox) {
-                checkbox.addEventListener('change', () => this.updateKeyboardDisplay());
+                checkbox.addEventListener('change', () => {
+                    this.updateKeyboardDisplay();
+                    this.changeURL();
+                });
             }
         });
 
@@ -1539,5 +1569,22 @@ export class SettingsManager {
 
         // Add one-time listener for calibration
         window.addEventListener('deviceorientation', handleCalibration, { once: true });
+    }
+
+    public loadFromURL(queryData: QueryData): void {
+        // Handle glissando mode explicitly
+        const glissandoMode = queryData['glissando_mode'];
+        if (glissandoMode !== undefined) {
+            this.settings.glissandoMode = glissandoMode === 'true';
+            if (window.settings) {
+                window.settings.glissandoMode = glissandoMode === 'true';
+            }
+            const glissandoCheckbox = document.getElementById('glissando_mode') as HTMLInputElement;
+            if (glissandoCheckbox) {
+                glissandoCheckbox.checked = glissandoMode === 'true';
+            }
+        }
+
+        // ... rest of URL parameter handling ...
     }
 } 

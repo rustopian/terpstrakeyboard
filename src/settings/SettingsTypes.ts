@@ -81,6 +81,7 @@ export type GridSettings = GridRequired;
  * @property sustainedNotes - Notes held by sustain
  * @property fadeoutTime - Note release time in seconds
  * @property glissandoMode - Whether glissando mode is enabled
+ * @property instrumentFade - Base volume multiplier for instrument (0.0 to 1.0)
  */
 export interface EventHandlerRequired {
   canvas: HTMLCanvasElement;
@@ -110,6 +111,7 @@ export interface EventHandlerRequired {
   tiltVolumeAxis: string;
   tiltVolume: number;
   glissandoMode: boolean;
+  instrumentFade: number;
 }
 
 /**
